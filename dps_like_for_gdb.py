@@ -23,14 +23,14 @@ import gdb
 import re
 
 class CommandDumpPointersWithSymbol(gdb.Command):
-    '''
+    """
     This class aims to do the same thing (approx yeah) as the dps' windbg command does:
         it displays one pointer per line with its symbol (if there is one)
 
     Usage:
         dps <register or address> <positive int>
         It will display n [D/Q]WORDs pointed by the register/address
-    '''
+    """
 
     def __init__(self):
         gdb.Command.__init__(self, 'dps', gdb.COMMAND_STACK)
@@ -43,9 +43,9 @@ class CommandDumpPointersWithSymbol(gdb.Command):
         self.zones = self._parse_info_files()
 
     def _get_cpu_register(self, reg):
-        '''
+        """
         Get the value holded by a CPU register
-        '''
+        """
 
         expr = ''
         if reg[0] == '$':
@@ -67,18 +67,18 @@ class CommandDumpPointersWithSymbol(gdb.Command):
         return ('%#.8x' if self.is_x86 else '%#.16x') % l
 
     def _deref_long_from_addr(self, addr):
-        '''
+        """
         Get the value pointed by addr
-        '''
+        """
 
         # now cast + deref
         val = gdb.Value(addr).cast(self.p_long).dereference()
         return self._normalize_long(long(val))
 
     def _where_it_points(self, address):
-        '''
+        """
         Walk out the memory mapping and try to find where the address is pointing
-        '''
+        """
         info = []
         for zone in self.zones:
             if zone['start'] <= address < zone['end']:
@@ -100,9 +100,9 @@ class CommandDumpPointersWithSymbol(gdb.Command):
         return info
 
     def _is_register(self, s):
-        '''
+        """
         Is it a valid register ?
-        '''
+        """
         x86_reg = ['eax', 'ebx', 'ecx', 'edx', 'esi', 'edi', 'esp', 'ebp', 'eip']
         x64_reg = ['rax', 'rbx', 'rcx', 'rdx', 'rsi', 'rdi', 'rsp', 'rbp', 'rip'] + ['r%d' % i for i in range(8, 16)]
 
@@ -114,10 +114,10 @@ class CommandDumpPointersWithSymbol(gdb.Command):
         return False
 
     def _is_pointing_on_string(self, addr):
-        '''
+        """
         Is address is a pointer on a string ?
         Only strings with >= 3 characters are allowed
-        '''
+        """
         # we try to see if addr is a pointer on an ASCII string
         s = gdb.Value(addr).cast(self.p_char)
         try:
@@ -132,9 +132,9 @@ class CommandDumpPointersWithSymbol(gdb.Command):
         return None
 
     def _parse_info_files(self):
-        '''
+        """
         Creates a list of dictionnaries where you can find the start/end of all sharelibrary sections
-        '''
+        """
         r = gdb.execute('info files', to_string = True)
         zones = []
 
@@ -161,16 +161,16 @@ class CommandDumpPointersWithSymbol(gdb.Command):
         return zones
 
     def _clean_disass(self, disass):
-        '''
+        """
         Clean the disassembly
         When you have 'mov      eax, [ebx]', it returns 'mov eax, [ebx]'
-        '''
+        """
         return re.sub(r'\s+', ' ', disass)
 
     def _get_additionnal_info(self, addr, section):
-        '''
+        """
         Try to know if the address is a string pointer, if not it try to disassemble the first instruction
-        '''
+        """
         # before any test, we want to know if the memory is accessible
         try:
             self._deref_long_from_addr(addr)
@@ -203,9 +203,9 @@ class CommandDumpPointersWithSymbol(gdb.Command):
         return signature
 
     def invoke(self, arg, from_tty):
-        '''
+        """
         The core of the command
-        '''
+        """
         arguments = arg.split(' ')
         assert(len(arguments) == 2)
 
