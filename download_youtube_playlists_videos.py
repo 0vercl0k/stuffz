@@ -36,6 +36,7 @@ import string
 import os
 import gdata.youtube
 import gdata.youtube.service
+from pprint import pprint
 
 def sanitize_title(s):
     """
@@ -72,8 +73,9 @@ def get_video_info(video_id):
     if r:
         content = r.read()
         content_parsed = parse_qs(content)
-        fmt_stream_map = content_parsed['url_encoded_fmt_stream_map'][0]
-        info['video_url'] = parse_qs(fmt_stream_map)['url'][0]
+        fmt_stream_map = parse_qs(content_parsed['url_encoded_fmt_stream_map'][0])
+        # Do not forget Youtube want the signature param
+        info['video_url'] = fmt_stream_map['url'][0] + '&signature=' + fmt_stream_map['sig'][0]
         info['video_title'] = sanitize_title(content_parsed['title'][0])
     return info
 
@@ -86,7 +88,7 @@ def download_youtube_video(url, dir_out = '.'):
 
     # now get the token id
     info = get_video_info(vid)
-    path_out = os.sep.join([dir_out, info['video_title'] + '.flv'])
+    path_out = os.path.join(dir_out, info['video_title'] + '.flv')
 
     # check if the file doesn't already exist, if it is save some bandwidth & skip!
     if os.path.exists(path_out) == True:
@@ -133,7 +135,7 @@ def main(argc, argv):
         print '-> Downloading %s ("%s") in %s' % (playlist.title.text, playlist.description.text, path_out)
 
         # Parsing the html link and retrieve properly the playlist id holded in the variable 'p'
-        playlist_id = parse_qs(urlparse(playlist.GetHtmlLink().href).query)['p'][0]
+        playlist_id = parse_qs(urlparse(playlist.GetHtmlLink().href).query)['list'][0]
 
         # Now we want the videos contained by this playlist
         videos = yt_service.GetYouTubePlaylistVideoFeed(playlist_id = playlist_id)
