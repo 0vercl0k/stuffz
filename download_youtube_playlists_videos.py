@@ -22,21 +22,22 @@
 # ressources:
 #     https://developers.google.com/youtube/2.0/reference
 #     https://code.google.com/p/gdata-python-client/source/browse/#hg%2Fsrc%2Fgdata%2Fyoutube
+#     https://gdata-python-client.googlecode.com/hg/pydocs/gdata.youtube.html
 
-# To run this script, you have to install:
-#   * elementtree -- http://effbot.org/zone/element-index.htm#installation
-#   * gdata api -- https://gdata-python-client.googlecode.com/files/gdata-2.0.17.zip
+# Testing & Troubleshooting : --> http://gdata.youtube.com/demo/index.html <--
 
 
 import sys
-from urllib import urlopen, urlencode
+from urllib2 import urlopen
+from urllib import urlencode
 from urlparse import parse_qs, urlparse
-from re import findall
+from time import sleep
 import string
 import os
-import gdata.youtube
-import gdata.youtube.service
-from pprint import pprint
+import json
+
+def make_request(url):
+    return json.loads(urlopen(url).read())
 
 def sanitize_title(s):
     """
@@ -74,7 +75,8 @@ def get_video_info(video_id):
         content = r.read()
         content_parsed = parse_qs(content)
         fmt_stream_map = parse_qs(content_parsed['url_encoded_fmt_stream_map'][0])
-        # Do not forget Youtube want the signature param
+
+        # Do not forget Youtube wants the signature param
         info['video_url'] = fmt_stream_map['url'][0] + '&signature=' + fmt_stream_map['sig'][0]
         info['video_title'] = sanitize_title(content_parsed['title'][0])
     return info
@@ -89,12 +91,14 @@ def download_youtube_video(url, dir_out = '.'):
     # now get the token id
     info = get_video_info(vid)
     path_out = os.path.join(dir_out, info['video_title'] + '.flv')
+    
+    print ' -> Downloading "%s" in "%s"..' % (info['video_title'], path_out)
 
     # check if the file doesn't already exist, if it is save some bandwidth & skip!
     if os.path.exists(path_out) == True:
+        print '    -> You already got this song'
         return
 
-    print ' -> Downloading "%s" in "%s"..' % (info['video_title'], path_out)
     with open(path_out, 'wb') as f:
         r = urlopen(info['video_url'])
         while True:
@@ -113,35 +117,43 @@ def main(argc, argv):
     base_path = '.' if argc == 2 else argv[2]
     assert(os.path.isdir(base_path))
 
-    print 'Initializing the google API..'
-    # "Before you can perform any operations with the YouTube Data API, you must initialize a gdata.youtube.service.YouTubeService object"
-    yt_service = gdata.youtube.service.YouTubeService()
-
-    # Turn on HTTPS/SSL access
-    yt_service.ssl = True
-
     print 'Retrieving the playlists of %s..' % argv[1]
 
     # Getting the (public) playlist for a specific user
-    playlists = yt_service.GetYouTubePlaylistFeed(username = argv[1])
-    for playlist in playlists.entry:
+    playlists = make_request('https://gdata.youtube.com/feeds/api/users/%s/playlists?alt=json' % argv[1])['feed']['entry']
+    for playlist in playlists:
+
+        playlist_title = playlist['title']['$t']
+        playlist_desc = playlist['yt$description']['$t']
+        playlist_id = playlist['yt$playlistId']['$t']
+
         # Preparing the out directory to store the videos in
-        path_out = os.sep.join([base_path, sanitize_title(playlist.title.text)])
+        path_out = os.sep.join([base_path, sanitize_title(playlist_title)])
         
         # Ensure to create the directory if it doesn't exist
         if os.path.exists(path_out) == False:
             os.mkdir(path_out)
 
-        print '-> Downloading %s ("%s") in %s' % (playlist.title.text, playlist.description.text, path_out)
+        print '-> Downloading %s ("%s") in %s' % (playlist_title, playlist_desc, path_out)
 
-        # Parsing the html link and retrieve properly the playlist id holded in the variable 'p'
-        playlist_id = parse_qs(urlparse(playlist.GetHtmlLink().href).query)['list'][0]
+        start_index = 1
 
-        # Now we want the videos contained by this playlist
-        videos = yt_service.GetYouTubePlaylistVideoFeed(playlist_id = playlist_id)
-        for video in videos.entry:
-            # Let the show begin -- downloadin'
-            download_youtube_video(video.GetHtmlLink().href, path_out)
+        while True: 
+            playlist_url = 'https://gdata.youtube.com/feeds/api/playlists/%s?max-results=50&start-index=%d&alt=json' % (playlist_id, start_index)
+            
+            entries = make_request(playlist_url)['feed']
+            if not 'entry' in entries:
+                print '-> Fully downloaded the playlist.'
+                break
+
+            for entry in entries['entry']:
+                # We want the link associated with the type 'text/html'
+                link_html = filter(lambda l: l['type'] == 'text/html', entry['link'])[0]
+                # Let the show begin -- downloadin'
+                download_youtube_video(link_html['href'], path_out)
+                start_index += 1
+
+            sleep(1)
     return 1
 
 if __name__ == '__main__':
