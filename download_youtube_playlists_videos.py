@@ -26,7 +26,6 @@
 
 # Testing & Troubleshooting : --> http://gdata.youtube.com/demo/index.html <--
 
-
 import sys
 from urllib2 import urlopen
 from urllib import urlencode
@@ -36,112 +35,109 @@ import string
 import os
 import json
 
-def make_request(url):
-    return json.loads(urlopen(url).read())
+class YoutubeVideoDownloader:
+    """ This class aims to download easily a Youtube video and to keep it on your filesystem. """
+    def __init__(self, video_link, where = '.'):
+        """ I need the Youtube video link and somewhere to store the video. """
+        self.video_link = video_link
 
-def sanitize_title(s):
-    """
-    A filename cannot be composed of all the printable characters (on windows, maybe linux files can),
-    """
-    white_list = [c for c in (string.letters + string.digits + ' ')]
-    sanitized_title = ''
-    for c in s:
-        if c in white_list:
-            sanitized_title += c
-    return sanitized_title
+        # get the video id (properly) holded in the variable "v"
+        self.video_id = parse_qs(urlparse(self.video_link).query)['v'][0]
 
-def get_video_info(video_id):
-    """
-    Retrieve some useful information concerning the video,
-    like the title or where we can get the video file.
+        info = self.__get_video_info(self.video_id)
+        self.title = info['video_title']
+        self.where = os.path.join(where, self.title + '.flv')
+        self.video_ddl_link = info['video_url']
+    
+    def __sanitize_title(self, s):
+        """ Only keep the alphanum characters on the filename """
+        white_list = list(string.letters + string.digits + ' ')
+        return filter(lambda c: c in white_list, s)
 
-    You can also find stuff concerning the encoding format
-    available etc.
-    """
-    args = urlencode({
-        'asv': 3,
-        'el': 'detailpage',
-        'hl': 'en_US',
-        'video_id': video_id
-    })
+    def __get_video_info(self, video_id):
+        """
+        Retrieve some useful information concerning a video,
+        like the title or where we can get the video file.
 
-    info = {
-        'video_url' : '',
-        'video_title' : ''
-    }
+        You can also find stuff concerning the encoding format
+        available etc.
+        """
+        args = urlencode({
+            'asv': 3,
+            'el': 'detailpage',
+            'hl': 'en_US',
+            'video_id': video_id
+        })
 
-    r = urlopen('https://www.youtube.com/get_video_info?' + args)
-    if r:
-        content = r.read()
+        info = {
+            'video_url' : '',
+            'video_title' : ''
+        }
+
+        content = urlopen('https://www.youtube.com/get_video_info?' + args).read()
         content_parsed = parse_qs(content)
         fmt_stream_map = parse_qs(content_parsed['url_encoded_fmt_stream_map'][0])
 
         # Do not forget Youtube wants the signature param
         info['video_url'] = fmt_stream_map['url'][0] + '&signature=' + fmt_stream_map['sig'][0]
-        info['video_title'] = sanitize_title(content_parsed['title'][0])
-    return info
+        info['video_title'] = self.__sanitize_title(content_parsed['title'][0])
+        return info
 
-def download_youtube_video(url, dir_out = '.'):
-    """
-    Download a video from youtube and save it in dir_out
-    """
-    # get the video id (properly) holded in the variable "v"
-    vid = parse_qs(urlparse(url).query)['v'][0]
+    def download(self):
+        """ Download a Youtube video and save it on your filesystem """   
+        print ' -> Downloading "%s" in "%s"..' % (self.title, self.where)
 
-    # now get the token id
-    info = get_video_info(vid)
-    path_out = os.path.join(dir_out, info['video_title'] + '.flv')
-    
-    print ' -> Downloading "%s" in "%s"..' % (info['video_title'], path_out)
+        # check if the file doesn't already exist, if it is save some bandwidth & skip!
+        if os.path.exists(self.where) == True:
+            print '    -> You already got this song'
+            return
 
-    # check if the file doesn't already exist, if it is save some bandwidth & skip!
-    if os.path.exists(path_out) == True:
-        print '    -> You already got this song'
-        return
+        with open(self.where, 'wb') as f:
+            r = urlopen(self.video_ddl_link)
+            while True:
+                c = r.read(8192)
+                if not c:
+                    break
+                f.write(c)
 
-    with open(path_out, 'wb') as f:
-        r = urlopen(info['video_url'])
-        while True:
-            c = r.read(8192)
-            if not c:
-                break
-            f.write(c)
-    print '  -> DONE'
+        print '  -> DONE'
 
-def main(argc, argv):
-    if argc == 1:
-        print 'Usage: ./download_youtube_playlists_videos.py <username> [<base_path>]'
-        return -1
+class YoutubePlaylistDownloader:
+    """ This class aims to download easily a Youtube playlist. """
+    def __init__(self, playlist_link, where = '.'):
+        self.playlist_link = playlist_link
 
-    # Where we will store the playlists and the tracks on your filesystem -- default is the current path
-    base_path = '.' if argc == 2 else argv[2]
-    assert(os.path.isdir(base_path))
+        # Get the playlist id in the 'list' variable
+        self.playlist_id = parse_qs(urlparse(self.playlist_link).query)['list'][0]
 
-    print 'Retrieving the playlists of %s..' % argv[1]
+        # Get the title of the playlist and its description
+        s = self.__make_request()
+        self.title = s['title']['$t']
+        self.description = s['subtitle']['$t']
+        self.where = os.path.join(where, self.__sanitize_title(self.title))
 
-    # Getting the (public) playlist for a specific user
-    playlists = make_request('https://gdata.youtube.com/feeds/api/users/%s/playlists?alt=json' % argv[1])['feed']['entry']
-    for playlist in playlists:
+    def __sanitize_title(self, s):
+        """ Only keep the alphanum characters on the filename """
+        white_list = list(string.letters + string.digits + ' ')
+        return filter(lambda c: c in white_list, s)
 
-        playlist_title = playlist['title']['$t']
-        playlist_desc = playlist['yt$description']['$t']
-        playlist_id = playlist['yt$playlistId']['$t']
+    def __make_request(self, start_index = 1):
+        """ Retrieve a JSON content somewhere on the internet """
+        url_playlist_api = 'https://gdata.youtube.com/feeds/api/playlists/%s?max-results=50&start-index=%d&alt=json' % (self.playlist_id, start_index)
+        return json.loads(urlopen(url_playlist_api).read())['feed']
 
-        # Preparing the out directory to store the videos in
-        path_out = os.sep.join([base_path, sanitize_title(playlist_title)])
-        
+    def download(self):
+        """ Download all the song composing your playlist """       
         # Ensure to create the directory if it doesn't exist
-        if os.path.exists(path_out) == False:
-            os.mkdir(path_out)
+        if os.path.exists(self.where) == False:
+            os.mkdir(self.where)
 
-        print '-> Downloading %s ("%s") in %s' % (playlist_title, playlist_desc, path_out)
+        print '-> Downloading %s ("%s") in %s' % (self.title, self.description, self.where)
 
         start_index = 1
-
-        while True: 
-            playlist_url = 'https://gdata.youtube.com/feeds/api/playlists/%s?max-results=50&start-index=%d&alt=json' % (playlist_id, start_index)
-            
-            entries = make_request(playlist_url)['feed']
+        count = 0
+        while True:
+            entries = self.__make_request(start_index)
             if not 'entry' in entries:
                 print '-> Fully downloaded the playlist.'
                 break
@@ -149,11 +145,51 @@ def main(argc, argv):
             for entry in entries['entry']:
                 # We want the link associated with the type 'text/html'
                 link_html = filter(lambda l: l['type'] == 'text/html', entry['link'])[0]
-                # Let the show begin -- downloadin'
-                download_youtube_video(link_html['href'], path_out)
-                start_index += 1
 
+                # Let the show begin -- downloadin'
+                YoutubeVideoDownloader(link_html['href'], self.where).download()
+                count += 1
+
+            if count == 0:
+                break
+
+            start_index += count
+            count = 0
             sleep(1)
+
+class YoutubeUserPlaylistsDownloader:
+    """ This class aims to download easily all the playlists of a Youtube user via its nickname """
+    def __init__(self, username, where = '.'):
+        self.username = username
+        self.where = where
+
+    def __sanitize_title(self, s):
+        """ Only keep the alphanum characters on the filename """
+        white_list = list(string.letters + string.digits + ' ')
+        return filter(lambda c: c in white_list, s)
+
+    def __make_request(self):
+        url_user_api = 'https://gdata.youtube.com/feeds/api/users/%s/playlists?alt=json' % self.username
+        return json.loads(urlopen(url_user_api).read())['feed']
+
+    def download(self):
+        """ Download all the playlists of an user """
+        playlists = self.__make_request()
+        for playlist in playlists:
+            link_html = filter(lambda l: l['type'] == 'text/html', entry['link'])[0]
+            YoutubePlaylistDownloader(link_html, self.where).download()
+
+def main(argc, argv):
+    if argc == 1:
+        print 'Usage: ./download_youtube_playlists_videos.py <username> [<base_path>]'
+        return -1
+
+    # Where we will store the playlists and the tracks on your filesystem -- default is the current directory
+    base_path = '.' if argc == 2 else argv[2]
+    assert(os.path.isdir(base_path))
+
+    print 'Retrieving the playlists of %s..' % argv[1]
+    YoutubeUserPlaylistsDownloader(argv[1], base_path).download()
     return 1
 
 if __name__ == '__main__':
