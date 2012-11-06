@@ -36,10 +36,17 @@ import os
 import json
 import multiprocessing
 
-class YoutubeVideoDownloader:
+class VideoDownloader:
     """ This class aims to download easily a Youtube video and to keep it on your filesystem. """
+
     def __init__(self, video_link, where = '.'):
-        """ I need the Youtube video link and somewhere to store the video. """
+        """
+        video_link: is the URL of your video
+        where: A relative / absolute path of where the video will be stored
+
+        Example:
+        >>> VideoDownloader('http://www.youtube.com/watch?v=e2-6dYPEBw4', '/tmp').download()
+        """
         self.video_link = video_link
 
         # get the video id (properly) holded in the variable "v"
@@ -109,15 +116,20 @@ class YoutubeVideoDownloader:
             return str(e), self.title
         return 'Downloaded', self.title
 
-def youtube_download_video(args):
-    """ A simple wrapper of YoutubeVideoDownloader to use with a process pool """
+def download_video(args):
+    """ A simple wrapper of VideoDownloader to use with a process pool """
     link = args['link']
     where = args['where']
-    return YoutubeVideoDownloader(link, where).download()
+    return VideoDownloader(link, where).download()
 
-class YoutubePlaylistDownloader:
-    """ This class aims to download easily a Youtube playlist. """
+class PlaylistDownloader:
+    """ This class aims to download easily a Youtube playlist with a pool of worker processes. """
+
     def __init__(self, playlist_link, where = '.', max_process = 3):
+        """
+        Example:
+        >>> PlaylistDownloader('http://www.youtube.com/playlist?list=PL5A00B9A56C4B60E5', '/tmp/AOTP', 4).download()
+        """
         self.playlist_link = playlist_link
         self.workers = multiprocessing.Pool(processes = max_process)
 
@@ -150,6 +162,7 @@ class YoutubePlaylistDownloader:
         print '[%s] Iterating %s ("%s")..' % (multiprocessing.current_process().name, self.title, self.description)
         start_index = 1
         work_todo = []
+
         while True:
             entries = self.__make_request(start_index)
             if not 'entry' in entries:
@@ -170,15 +183,20 @@ class YoutubePlaylistDownloader:
                 start_index += 1
 
         print '[%s] %d songs fetched, WORKERS ARE YOU READY ? AOUUU AOUU' % (multiprocessing.current_process().name, len(work_todo))
-        results = self.workers.map(youtube_download_video, work_todo)
+        results = self.workers.map(download_video, work_todo)
+
         print '[%s] Fully downloaded the playlist.' % multiprocessing.current_process().name
         self.workers.terminate()
         self.workers.join()
 
-
-class YoutubeUserPlaylistsDownloader:
+class UserPlaylistsDownloader:
     """ This class aims to download easily all the playlists of a Youtube user via its nickname """
+
     def __init__(self, username, where = '.'):
+        """
+        Example:
+        >>> UserPlaylistsDownloader('doublebubble66', '/tmp/').download()
+        """
         self.username = username
         self.where = where
 
@@ -196,7 +214,8 @@ class YoutubeUserPlaylistsDownloader:
         playlists = self.__make_request()
         for playlist in playlists['entry']:
             link_html = filter(lambda l: l['type'] == 'text/html', playlist['link'])[0]
-            YoutubePlaylistDownloader(link_html['href'], self.where).download()
+            PlaylistDownloader(link_html['href'], self.where).download()
+
 
 def main(argc, argv):
     if argc == 1:
@@ -208,7 +227,7 @@ def main(argc, argv):
     assert(os.path.isdir(base_path))
 
     print 'Retrieving the playlists of %s..' % argv[1]
-    YoutubeUserPlaylistsDownloader(argv[1], base_path).download()
+    UserPlaylistsDownloader(argv[1], base_path).download()
     return 1
 
 if __name__ == '__main__':
