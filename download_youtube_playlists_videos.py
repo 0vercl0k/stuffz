@@ -57,12 +57,6 @@ class VideoDownloader:
         self.where = os.path.join(where, self.title + '.flv')
         self.video_ddl_link = info['video_url']
     
-    def get_result(self):
-        return self.result
-
-    def get_title(self):
-        return self.title
-
     def __sanitize_title(self, s):
         """ Only keep the alphanum characters on the filename """
         white_list = list(string.letters + string.digits + ' ')
