@@ -23,7 +23,7 @@ import sys
 import os
 from subprocess import call
 
-VLC_PATH = r'C:\Program Files (x86)\VideoLAN\VLC\vlc.exe'
+VLC_PATH = r'C:\Program Files (x86)\VideoLAN\VLC119\vlc.exe'
 
 def main(argc, argv):
     if argc == 1:
@@ -38,12 +38,12 @@ def main(argc, argv):
         for f in files:
             src_file = os.path.join(root, f)
             dst_file = os.path.join(dst, f) + '.wav'
-
-            print 'Extracting audio from "%s" to "%s"..' % (src_file, dst_file)
-            # http://wiki.videolan.org/Extract_audio
-            args = [VLC_PATH] + '-I dummy --no-sout-video --sout-audio --no-sout-rtp-sap --no-sout-standard-sap --ttl=1 --sout-keep --sout'.split(' ')
-            args += ['#transcode{acodec=s16l,channels=2}:std{access=file,mux=wav,dst=%s}' % dst_file, "%s" % src_file, 'vlc://quit']
-            call(args)
+            if os.path.isfile(dst_file) == False:
+                print 'Extracting audio from "%s" to "%s"..' % (src_file, dst_file)
+                # http://wiki.videolan.org/Extract_audio
+                args = [VLC_PATH] + '-I dummy --no-sout-video --sout-audio --no-sout-rtp-sap --no-sout-standard-sap --ttl=1 --sout-keep --sout'.split(' ')
+                args += ['#transcode{acodec=s16l,channels=2}:std{access=file,mux=wav,dst=%s}' % dst_file, "%s" % src_file, 'vlc://quit']
+                call(args)
     return 1
 
 if __name__ == '__main__':

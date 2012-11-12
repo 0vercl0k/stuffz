@@ -36,6 +36,8 @@ import os
 import json
 import multiprocessing
 
+p_name = multiprocessing.current_process().name
+
 class VideoDownloader:
     """ This class aims to download easily a Youtube video and to keep it on your filesystem. """
 
@@ -97,7 +99,7 @@ class VideoDownloader:
         if os.path.exists(self.where) == True:
             return 'Already Downloaded', self.title
 
-        print '[%s] Starts to download "%s"..' % (multiprocessing.current_process().name, self.title)
+        print '[%s] Starts to download "%s"..' % (p_name, self.title)
         try:
             with open(self.where, 'wb') as f:
                 r = urlopen(self.video_ddl_link)
@@ -114,7 +116,10 @@ def download_video(args):
     """ A simple wrapper of VideoDownloader to use with a process pool """
     link = args['link']
     where = args['where']
-    return VideoDownloader(link, where).download()
+    try:
+        return VideoDownloader(link, where).download()
+    except Exception, e:
+        print '[%s] Got an exception when trying to download "%s"' % (p_name, link) 
 
 class PlaylistDownloader:
     """ This class aims to download easily a Youtube playlist with a pool of worker processes. """
@@ -153,7 +158,7 @@ class PlaylistDownloader:
         if os.path.exists(self.where) == False:
             os.mkdir(self.where)
 
-        print '[%s] Iterating %s ("%s")..' % (multiprocessing.current_process().name, self.title, self.description)
+        print '[%s] Iterating %s ("%s")..' % (p_name, self.title, self.description)
         start_index = 1
         work_todo = []
 
@@ -176,10 +181,10 @@ class PlaylistDownloader:
 
                 start_index += 1
 
-        print '[%s] %d songs fetched, WORKERS ARE YOU READY ? AOUUU AOUU' % (multiprocessing.current_process().name, len(work_todo))
+        print '[%s] %d songs fetched, WORKERS ARE YOU READY ? AOUUU AOUU' % (p_name, len(work_todo))
         results = self.workers.map(download_video, work_todo)
 
-        print '[%s] Fully downloaded the playlist.' % multiprocessing.current_process().name
+        print '[%s] Fully downloaded the playlist.' % p_name
         self.workers.terminate()
         self.workers.join()
 
