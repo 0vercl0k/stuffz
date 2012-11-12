@@ -120,6 +120,7 @@ def download_video(args):
         return VideoDownloader(link, where).download()
     except Exception, e:
         print '[%s] Got an exception when trying to download "%s"' % (p_name, link) 
+        return 'Failed', link
 
 class PlaylistDownloader:
     """ This class aims to download easily a Youtube playlist with a pool of worker processes. """
