@@ -24,6 +24,7 @@ import socks
 import socket
 import urllib2
 import json
+import functools
 
 # If you want to disable the SOCKS5 proxy we have to remember the original function
 socket_function_saved = socket.socket
@@ -38,8 +39,11 @@ def disable_socks_proxy():
     """ Restore the original socket function to disable the SOCKS proxy """
     socket.socket = socket_function_saved
 
-def proxyfied(function):
+def pass_through_proxy(function):
     """ You can use this decorator when you want to use the SOCK5 proxy with a function """
+    # functools.wraps aims to have the same function.__name__, __doc__
+    # than the f returned by the decorator
+    @functools.wraps(function)
     def f(*args, **kwargs):
         enable_socks_proxy()
         r = function(*args, **kwargs)
@@ -51,8 +55,9 @@ def get_public_ip():
     """ Retrieve your public IP thanks to jsonip.com """
     return json.loads(urllib2.urlopen('http://jsonip.com/').read())['ip']
 
-@proxyfied
+@pass_through_proxy
 def get_public_ip_with_proxy():
+    """ get_public_ip version with proxy support """
     return get_public_ip()
 
 def get_new_tor_identity():
