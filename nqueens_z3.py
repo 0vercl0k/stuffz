@@ -64,7 +64,7 @@ def nqueens_constraint_programming(n):
     columns = [Int('c%d' % i) for i in range(n)]
     lines = [Int('l%d' % i) for i in range(n)]
     s = Solver()
-    # optimization trick: we set each column at a specific value, 0..N, it avoids a lot of useless constraint
+
     for i in range(n):
         s.add(columns[i] >= 0,columns[i] < n, lines[i] >= 0, lines[i] < n)
 
@@ -80,6 +80,30 @@ def nqueens_constraint_programming(n):
     m = s.model()
     return [(m[x].as_long(), m[y].as_long()) for x, y in zip(columns, lines)]
 
+def nqueens_constraint_programming_opti(n):
+    """Solves the problem of the nqueens thanks to constraint programming/z3 & a little trick"""
+    columns = [Int('c%d' % i) for i in range(n)]
+    # optimization trick: we set each column at a specific value, 0..N, it avoids a lot of useless constraint
+    # thx fireboot!
+    lines = range(n)
+    s = Solver()
+
+    for i in range(n):
+        # each queen must be in the chessboard's limits
+        s.add(columns[i] >= 0, columns[i] < n)
+
+    for i in range(n - 1):
+        for j in range(i + 1, n):
+            s.add(columns[i] != columns[j])
+            s.add(lines[i] != lines[j])
+            s.add(abs_z3(columns[i] - columns[j]) != abs_z3(lines[i] - lines[j]))
+
+    if s.check() == unsat:
+        raise Exception('Unsat bitch')
+
+    m = s.model()
+    return [(m[x].as_long(), y) for x, y in zip(columns, lines)]
+
 
 def display_solutions(s):
     chessboard = [[0] * len(s) for i in range(len(s))]
@@ -93,8 +117,9 @@ def main(argc, argv):
         return 0
 
     implementations = [
-        nqueens,
-        nqueens_constraint_programming
+        nqueens_constraint_programming_opti,
+        nqueens_constraint_programming,
+        nqueens
     ]
 
     for implementation in implementations:
@@ -102,8 +127,8 @@ def main(argc, argv):
         t1 = time()
         q = implementation(n)
         t2 = time()
-        print 'In (%s): %fs, %r' % (implementation.__name__, t2 - t1, q)
         display_solutions(q)
+        print 'With %s: %fs, %r' % (implementation.__name__, t2 - t1, q)
 
     return 1
 
