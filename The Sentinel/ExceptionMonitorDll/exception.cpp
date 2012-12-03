@@ -58,12 +58,6 @@ PCHAR ExceptionCodeToString(DWORD code)
     }
 }
 
-LONG WINAPI unhandled_exception_filter(struct _EXCEPTION_POINTERS *ExceptionInfo)
-{
-    TerminateProcess(GetCurrentProcess(), 0);
-    return NULL;
-}
-
 VOID log_exception(PEXCEPTION_RECORD ExceptionRecord, PCONTEXT Context)
 {   
     char image_path[MAX_PATH] = {0}, *command_line = GetCommandLine(), *executable_name = NULL;
