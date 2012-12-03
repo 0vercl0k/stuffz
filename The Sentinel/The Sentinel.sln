@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ProcessSpawner", "ProcessSpawner\ProcessSpawner.vcxproj", "{795FA206-2D53-4342-BF5D-294343FF356C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ExceptionMonitorDll", "ExceptionMonitorDll\ExceptionMonitorDll.vcxproj", "{2A99F15E-5A21-4FD7-A1E9-4D96551EE827}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{795FA206-2D53-4342-BF5D-294343FF356C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{795FA206-2D53-4342-BF5D-294343FF356C}.Debug|Win32.Build.0 = Debug|Win32
+		{795FA206-2D53-4342-BF5D-294343FF356C}.Release|Win32.ActiveCfg = Release|Win32
+		{795FA206-2D53-4342-BF5D-294343FF356C}.Release|Win32.Build.0 = Release|Win32
+		{2A99F15E-5A21-4FD7-A1E9-4D96551EE827}.Debug|Win32.ActiveCfg = Debug|Win32
+		{2A99F15E-5A21-4FD7-A1E9-4D96551EE827}.Debug|Win32.Build.0 = Debug|Win32
+		{2A99F15E-5A21-4FD7-A1E9-4D96551EE827}.Release|Win32.ActiveCfg = Release|Win32
+		{2A99F15E-5A21-4FD7-A1E9-4D96551EE827}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
