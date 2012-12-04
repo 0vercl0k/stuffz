@@ -36,15 +36,12 @@
 #define DEBUGMSG(...) /* \o/ */
 #endif
 
-DWORD SpawnProcessAndInjectDll(std::string path_executable, std::string executable_name, std::vector<std::string> arguments, std::string dll_path)
+DWORD SpawnProcessAndInjectDll(std::string path_executable, std::vector<std::string> arguments, std::string dll_path)
 {
     STARTUPINFO si = {0};
     PROCESS_INFORMATION pi = {0};
     bool ret = true;
-    std::string command_line(executable_name);
-
-    if(arguments.size() > 0)
-        command_line += ' ';
+    std::string command_line;
 
     for(std::vector<std::string>::const_iterator it = arguments.begin(); it != arguments.end(); ++it)
     {
@@ -84,25 +81,28 @@ DWORD SpawnProcessAndInjectDll(std::string path_executable, std::string executab
 
 int main(int argc, char* argv[])
 {
-    if(argc < 4)
+    if(argc < 3)
     {
-        printf("Usage: ./ProcessSpwaner <full path dll> <path executable> <excutable name> [args..]");
+        printf("Usage: ./ProcessSpwaner <full path dll> <path executable> [args..]");
         return EXIT_FAILURE;
     }
 
     /* Parse the command-line */
-    std::string full_path_dll(argv[1]), path_exec(argv[2]), executable_name(argv[3]);
+    std::string full_path_dll(argv[1]), path_exec(argv[2]);
     std::vector<std::string> arguments;
-    if(argc > 4)
+
+    // Don't forget the argv[0]!
+    arguments.push_back(path_exec);
+    if(argc > 2)
     {
-        for(int i = 4; i < argc; ++i)
+        for(int i = 3; i < argc; ++i)
             arguments.push_back(std::string(argv[i]));
     }
     
     DEBUGMSG("Directory of the process to spawn: %s\n", path_exec.c_str());
-    DEBUGMSG("Process name: %s\n", executable_name.c_str());
     DEBUGMSG("Full-path of the DLL to inject: %s\n", full_path_dll.c_str());
     DEBUGMSG("The process must be run with %d arguments\n", arguments.size());
+
     if(arguments.size() > 0)
     {
         for(std::vector<std::string>::const_iterator it = arguments.begin(); it != arguments.end(); ++it)
@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
     }
 
     DEBUGMSG("OK, spawning the process..\n");
-    DWORD does_it_worked = SpawnProcessAndInjectDll(path_exec, executable_name, arguments, full_path_dll);
+    DWORD does_it_worked = SpawnProcessAndInjectDll(path_exec, arguments, full_path_dll);
     DEBUGMSG("Is the process creation + dll injection worker ? %d\n", does_it_worked);
     return EXIT_SUCCESS;
 }
