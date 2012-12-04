@@ -50,7 +50,8 @@ DWORD SpawnProcessAndInjectDll(std::string path_executable, std::string executab
     {
         std::vector<std::string>::const_iterator it_end = arguments.end();
         --it_end;
-        command_line += *it;
+
+        command_line += '"' + *it + '"';
 
         if(it_end != it)
             command_line += ' ';
