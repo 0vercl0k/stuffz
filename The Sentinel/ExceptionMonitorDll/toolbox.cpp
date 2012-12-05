@@ -35,7 +35,7 @@ std::string generate_unique_report_path(PCHAR exec_name, DWORD exception_address
 
     report_path += exec_name;
 
-    /* Create a directory to store the crash of the target */
+    // Create a directory to store the crash of the target
     CreateDirectory(report_path.c_str(), NULL);
     st << "\\exceptionaddress_" << std::hex << exception_address;
     st << "pid_" << std::dec << GetCurrentProcessId();

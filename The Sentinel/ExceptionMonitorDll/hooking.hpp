@@ -25,6 +25,8 @@
 #ifndef HOOKING_HPP
 #define HOOKING_HPP
 
+#include "platform.h"
+
 #include <windows.h>
 
 /* Custom types */

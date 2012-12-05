@@ -25,6 +25,8 @@
 #ifndef TOOLBOX_HPP
 #define TOOLBOX_HPP
 
+#include "platform.h"
+
 #include <windows.h>
 #include <string>
 

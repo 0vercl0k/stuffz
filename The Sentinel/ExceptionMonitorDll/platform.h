@@ -22,13 +22,12 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
     
 */
-#ifndef MUTEX_HPP
-#define MUTEX_HPP
+#ifndef PLATFORM_H
+#define PLATFORM_H
 
-#include <windows.h>
-
-/* Global variables */
-// A mutex to avoid that the sleeping thread terminate the main thread which is writing the report
-extern HANDLE hMutex;
+// Yeah, in the future this file will hold processor specific stuffz, but for now..
+#ifdef _M_AMD64
+#error The project doesn't work (yet) for the x64 processor family, however it's on the TODO.
+#endif
 
 #endif

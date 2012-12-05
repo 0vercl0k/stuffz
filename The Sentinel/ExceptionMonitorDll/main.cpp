@@ -27,9 +27,10 @@
 #include "main.hpp"
 #include "hooking.hpp"
 #include "config.hpp"
-#include "mutex.hpp"
 
 #include <detours.h>
+
+CRITICAL_SECTION critical_section = {0};
 
 /*
    Some useful links:
@@ -42,7 +43,7 @@ DWORD WINAPI sleeping_thread(LPVOID lpParameter)
     Sleep(SLEEP_TIMEOUT);
 
     // Time to kill the process man, but be sure the second thread isn't writing the report!
-    WaitForSingleObject(hMutex, INFINITE);
+    EnterCriticalSection(&critical_section);
 
     // BRAAAAA
     TerminateProcess(GetCurrentProcess(), 0);
@@ -65,12 +66,8 @@ __declspec(dllexport) BOOL __stdcall DllMain(
 
             DWORD tid = 0;
 
-            // Creating a mutex to synchronize properly the two threads
-            hMutex = CreateMutex(
-                NULL,
-                FALSE,
-                NULL
-            );
+            // Initialize the critical section which be used to synchronize
+            InitializeCriticalSection(&critical_section);
 
             // Creating the sleeping thread
             CreateThread(

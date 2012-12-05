@@ -77,6 +77,7 @@ VOID log_exception(PEXCEPTION_RECORD ExceptionRecord, PCONTEXT Context)
 
     executable_name = strrchr(image_path, '\\') + 1;
 
+    // If we haven't initialized yet the path of the report, it's time to do it!
     if(report_path.size() == 0)
         report_path = generate_unique_report_path(executable_name, (DWORD)ExceptionRecord->ExceptionAddress);
 

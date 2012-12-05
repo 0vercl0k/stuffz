@@ -24,7 +24,6 @@
 */
 #include "hooking.hpp"
 #include "exception.hpp"
-#include "mutex.hpp"
 
 #include <detours.h>
 
@@ -35,17 +34,21 @@ KiUserExceptionDispatcher_t TrueKiUserExceptionDispatcher = (KiUserExceptionDisp
     "KiUserExceptionDispatcher"
 );
 
+// The address of the real kernel32.UnhandledExceptionFilter
 UnhandledExceptionFilter_t TrueUnhandledExceptionFilter = (UnhandledExceptionFilter_t)DetourFindFunction(
     "kernel32.dll",
     "UnhandledExceptionFilter"
 );
 
+extern CRITICAL_SECTION critical_section;
+
 LONG WINAPI UnhandledExceptionFilter_(struct _EXCEPTION_POINTERS *ExceptionInfo)
 {
-    /* If we reached there, it is a good sign, report it! */
-    WaitForSingleObject(hMutex, INFINITE);
+    /* If we reached there, it is a good (good for us, bad for the coder/program :)) sign, report it! */
+    EnterCriticalSection(&critical_section);
     log_exception(ExceptionInfo->ExceptionRecord, ExceptionInfo->ContextRecord);
-    ReleaseMutex(hMutex);
+    LeaveCriticalSection(&critical_section);
+
     TerminateProcess(GetCurrentProcess(), 0);
     return 0;
 }
@@ -63,9 +66,9 @@ VOID __declspec(naked) NTAPI KiUserExceptionDispatcher(PEXCEPTION_RECORD Excepti
         sub     esp, __LOCAL_SIZE       ;
     }
 
-    WaitForSingleObject(hMutex, INFINITE);
+    EnterCriticalSection(&critical_section);
     log_exception(ExceptionRecord, Context);
-    ReleaseMutex(hMutex);
+    LeaveCriticalSection(&critical_section);
     
     __asm
     {

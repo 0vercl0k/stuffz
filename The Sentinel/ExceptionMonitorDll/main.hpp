@@ -25,6 +25,7 @@
 #ifndef MAIN_HPP
 #define MAIN_HPP
 
+#include "platform.h"
 #include <windows.h>
 
 /* Function declarations */
