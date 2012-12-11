@@ -44,12 +44,12 @@ def get_the_grid_of_the_day():
     assert(len(bins) == 21)
 
     projections = {
-        '1,1' : bins[7 : 14],
-        '-1,1' : bins[ : 7],
-        '1,0' : bins[14 : ]
+        '-1,1' : bins[7 : 14],
+        '1,1' : bins[ : 7],
+        '0,-1' : bins[14 : ]
     }
 
-    projections['-1,1'].reverse()
+    projections['1,1'].reverse()
     return projections
 
 def display_mojette_grid(bins):
@@ -62,27 +62,40 @@ def display_mojette_grid(bins):
   |%d|%d|%d|%d|%d|
     |%d|%d|%d|''' % tuple(bins)
 
+# thx baaabz
+def create_int_constrainted(name, solver, A, B, C):
+    """Each pixel must be in [0 - 9], but you must fill the
+    grid with only 3 digit among the range"""
+    x = Int(name)
+    solver.add(Or(x == A, x == B, x == C))
+    return x
+
 def solve_mojette_grid(projections):
-    """Solve the grid thanks to z3py"""
-    # each bin is numeroted from 0 to 23 starting at the left bottom
-    bins = [Int('b%d' % i) for i in range(24)]
+    """Solve the grid thanks to z3py
+    A bit of terminology:
+        - The grid is composed of 24 pixels
+        - A projection is composed of bins
+        - Each projection is identified by an angle (p, q)"""
+
     s = Solver()
 
-    # each bin must be in the range [0 - 9]
-    for bin in bins:
-        s.add(bin < 10, bin >= 0)
-
-    # Little schema of the bins indexes:
+    # This is the only 3 values we'll use to fill the grid
+    A, B, C = Ints('A B C')
+    s.add(A >= 0, A <= 9, B >= 0, B <= 9, C >= 0, C <= 9)
+    s.add(Distinct(A, B, C))
+   
+    # Little schema of the pixel indexes:
     #         |00|
     #      |01|02|03|
     #    |04|05|06|07|08|
     # |09|10|11|12|13|14|15|
     #    |16|17|18|19|20|
     #      |21|22|23|
+    pixels = [create_int_constrainted('b%d' % i, s, A, B, C) for i in range(24)]
 
-    idx = {
-        '1,1' : [
-            # indexes of the bins constrainted by the first projection: 1,1
+    projections_info = {
+        '-1,1' : [
+            # indexes of the pixels constrained by the first projection: -1,1
             [0, 3, 8, 15],
             [2, 7, 14],
             [1, 6, 13, 20],
@@ -92,8 +105,8 @@ def solve_mojette_grid(projections):
             [9, 16, 21]
         ],
 
-        '1,0' : [
-            # indexes of the bins constrainted by the second projection: 1,0
+        '0,-1' : [
+            # indexes of the pixels constrained by the second projection: 1,0
             [9],
             [16, 10, 4],
             [21, 17, 11, 5, 1],
@@ -103,8 +116,8 @@ def solve_mojette_grid(projections):
             [15]
         ],
 
-        '-1,1' : [
-            # indexes of the bins constrainted by the third projection: -1,1
+        '1,1' : [
+            # indexes of the pixels constrained by the third projection: -1,1
             [0, 1, 4, 9],
             [2, 5, 10],
             [3, 6, 11, 16],
@@ -115,18 +128,18 @@ def solve_mojette_grid(projections):
         ]
     }
 
-    for projection_angle, bins_constraints in idx.iteritems():
+    for projection_angle, pixels_constrained in projections_info.iteritems():
         idx_projection = 0
-        for bins_idx in bins_constraints:
-            bins_csts = map(lambda bin_idx: bins[bin_idx], bins_idx)
-            s.add(Sum(bins_csts) == projections[projection_angle][idx_projection])
+        for pixels_idx in pixels_constrained:
+            pixels_values = map(lambda pixel_idx: pixels[pixel_idx], pixels_idx)
+            s.add(Sum(pixels_values) == projections[projection_angle][idx_projection])
             idx_projection += 1
 
     if s.check() == unsat:
         raise Exception('The model is not sat, i guess something went wrong.')
 
     m = s.model()
-    return [m[bin].as_long() for bin in bins]
+    return [m[pixel].as_long() for pixel in pixels]
 
 def main(argc, argv):
     print 'Getting the projections from the website..'
