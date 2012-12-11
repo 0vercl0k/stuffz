@@ -47,7 +47,7 @@ def graph_coloring(graph):
 
 def build_peternson_3_coloring_graph():
     """Build http://en.wikipedia.org/wiki/File:Petersen_graph_3-coloring.svg"""
-    G = pgv.AGraph()
+    G = pgv.AGraph(directed = False)
     edges = [
         (0, 2), (0, 1), (0, 5), (0, 4), (1, 6), (1, 7),
         (2, 3), (2, 8), (3, 4), (3, 7), (4, 5), (4, 6),
@@ -58,7 +58,8 @@ def build_peternson_3_coloring_graph():
         G.add_node(i)
 
     for src, dst in edges:
-        G.add_edge(src, dst)
+        # Hum, the attribute 'directed' doesn't seem to work, so that's my workaround.
+        G.add_edge(src, dst, dir = 'none')
 
     return G
 
