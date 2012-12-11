@@ -20,6 +20,7 @@
 #
 
 import sys
+import time
 from z3 import *
 
 class Graph:
@@ -57,7 +58,7 @@ def graph_coloring(graph):
 
     for i in range(len(graph.nodes())):
         for node_color in nodes_colors:
-            s.add(node_color >= 0, node_color <= i)
+            s.add(node_color >= 0, node_color < i)
 
         for node in graph.nodes():
             color = Int('k%s' % node)
@@ -93,9 +94,11 @@ def main(argc, argv):
     G = build_peternson_3_coloring_graph()
 
     print '%s successfully built, trying to color it now..' % repr(G.name)
+    t1 = time.time()
     s = graph_coloring(G)
+    t2 = time.time()
 
-    print 'Here is the solution:'
+    print 'Here is the solution (in %ds):' % (t2 - t1)
     print s
     return 1
 
