@@ -21,60 +21,35 @@
 
 import sys
 import time
+import pygraphviz as pgv
 from z3 import *
-
-class Graph:
-    def __init__(self, name):
-        self.list_neighbor = {}
-        self.list_node = {}
-        self.name = name
-
-    def add_node(self, node):
-        self.list_node[node] = True
-
-    def add_edge(self, node, nodebis):
-        if node not in self.list_neighbor:
-            self.list_neighbor[node] = []
-
-        if nodebis not in self.list_neighbor[node]:
-            self.list_neighbor[node].append(nodebis)
-
-        if nodebis not in self.list_neighbor:
-            self.list_neighbor[nodebis] = []
-
-        if node not in self.list_neighbor[nodebis]:
-            self.list_neighbor[nodebis].append(node)
-
-    def neighbors(self, node):
-        return self.list_neighbor[node] if node in self.list_neighbor else []
-
-    def nodes(self):
-        return self.list_node.keys()
 
 def graph_coloring(graph):
     """Try to color graph with the least color possible"""
     s = Solver()
-    nodes_colors = [Int('k%d' % n) for n in graph.nodes()]
+    nodes_colors = dict((node_name, Int('k%r' % node_name)) for node_name in graph.nodes())
 
-    for i in range(len(graph.nodes())):
-        for node_color in nodes_colors:
-            s.add(node_color >= 0, node_color < i)
+    for i in range(1, graph.number_of_nodes()):
+        for node_color in nodes_colors.values():
+            s.add(node_color >= 0, node_color <= i)
 
         for node in graph.nodes():
-            color = Int('k%s' % node)
             for neighbor in graph.neighbors(node):
-                s.add(color != nodes_colors[neighbor])
+                s.add(nodes_colors[node] != nodes_colors[neighbor])
 
         if s.check() == unsat:
             s.reset()
         else:
             print 'OK, found a solution with %d colors' % (i + 1)
             m = s.model()
-            return [('node_%d' % x, m[color].as_long()) for x, color in enumerate(nodes_colors)]
+            return dict((name, m[color].as_long()) for name, color in nodes_colors.iteritems())
+
+    print 'Could not find a solution.'
+    return None
 
 def build_peternson_3_coloring_graph():
     """Build http://en.wikipedia.org/wiki/File:Petersen_graph_3-coloring.svg"""
-    G = Graph('peternson 3-coloring graph')
+    G = pgv.AGraph()
     edges = [
         (0, 2), (0, 1), (0, 5), (0, 4), (1, 6), (1, 7),
         (2, 3), (2, 8), (3, 4), (3, 7), (4, 5), (4, 6),
@@ -93,13 +68,29 @@ def main(argc, argv):
     print 'Building the graph..'
     G = build_peternson_3_coloring_graph()
 
-    print '%s successfully built, trying to color it now..' % repr(G.name)
+    print 'Graph successfully built, trying to color it now..'
     t1 = time.time()
     s = graph_coloring(G)
     t2 = time.time()
 
     print 'Here is the solution (in %ds):' % (t2 - t1)
     print s
+
+    print 'Reconstructing the graph with colors..'
+    color_available = [
+        'red',
+        'blue',
+        'green',
+        'pink'
+    ]
+
+    for node in G.nodes_iter():
+        n = G.get_node(node)
+        n.attr['color'] = color_available[s[node]]
+
+    print 'Saving it in the current directory..'
+    G.layout('circo')
+    G.draw('./graph_colored.png')
     return 1
 
 if __name__ == '__main__':
