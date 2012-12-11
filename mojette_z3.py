@@ -119,11 +119,7 @@ def solve_mojette_grid(projections):
         idx_projection = 0
         for bins_idx in bins_constraints:
             bins_csts = map(lambda bin_idx: bins[bin_idx], bins_idx)
-            if len(bins_csts) > 1:
-                s.add(reduce(operator.add, bins_csts) == projections[projection_angle][idx_projection])
-            else:
-                s.add(bins_csts[0] == projections[projection_angle][idx_projection])
-
+            s.add(Sum(bins_csts) == projections[projection_angle][idx_projection])
             idx_projection += 1
 
     if s.check() == unsat:
