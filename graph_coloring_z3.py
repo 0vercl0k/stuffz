@@ -30,10 +30,8 @@ def graph_coloring(graph):
     nodes_colors = dict((node_name, Int('k%r' % node_name)) for node_name in graph.nodes())
 
     for i in range(1, graph.number_of_nodes()):
-        for node_color in nodes_colors.values():
-            s.add(node_color >= 0, node_color <= i)
-
         for node in graph.nodes():
+            s.add(nodes_colors[node] >= 0, nodes_colors[node] <= i)
             for neighbor in graph.neighbors(node):
                 s.add(nodes_colors[node] != nodes_colors[neighbor])
 
