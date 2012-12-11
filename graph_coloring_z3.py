@@ -75,7 +75,7 @@ def main(argc, argv):
     print 'Here is the solution (in %ds):' % (t2 - t1)
     print s
 
-    print 'Reconstructing the graph with colors..'
+    print 'Setting the colors on the nodes..'
     color_available = [
         'red',
         'blue',
