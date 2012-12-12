@@ -55,41 +55,55 @@ def build_peternson_3_coloring_graph():
     ]
 
     for i in range(10):
-        G.add_node(i)
+        G.add_node(i, style = 'filled')
 
     for src, dst in edges:
         # Hum, the attribute 'directed' doesn't seem to work, so that's my workaround.
         G.add_edge(src, dst, dir = 'none')
 
-    return G
+    return (G, 'peternson_3_coloring_graph', 'circo')
+
+def build_fat_graph():
+    """Build http://www.graphviz.org/content/twopi2"""
+    G = pgv.AGraph('graph_coloring_z3_example_fat_graph.gv')
+    return (G, 'twopi2_fat_graph', 'twopi')
 
 def main(argc, argv):
     print 'Building the graph..'
-    G = build_peternson_3_coloring_graph()
 
-    print 'Graph successfully built, trying to color it now..'
-    t1 = time.time()
-    s = graph_coloring(G)
-    t2 = time.time()
-
-    print 'Here is the solution (in %ds):' % (t2 - t1)
-    print s
-
-    print 'Setting the colors on the nodes..'
-    color_available = [
-        'red',
-        'blue',
-        'green',
-        'pink'
+    Gs = [
+        build_peternson_3_coloring_graph(),
+        build_fat_graph()
     ]
 
-    for node in G.nodes_iter():
-        n = G.get_node(node)
-        n.attr['color'] = color_available[s[node]]
+    for G, name, layout in Gs:
+        print 'Trying to color %s now (%d nodes, %d edges)..' % (repr(name), G.number_of_nodes(), G.number_of_edges())
+        t1 = time.time()
+        s = graph_coloring(G)
+        t2 = time.time()
 
-    print 'Saving it in the current directory..'
-    G.layout('circo')
-    G.draw('./graph_colored.png')
+        print 'Here is the solution (in %ds):' % (t2 - t1)
+        if len(s) < 20:
+            print s
+        else:
+            print 'Too long, see the .png!'
+
+        print 'Setting the colors on the nodes..'
+        color_available = [
+            'red',
+            'blue',
+            'green',
+            'pink'
+        ]
+
+        for node in G.nodes_iter():
+            n = G.get_node(node)
+            n.attr['color'] = color_available[s[node]]
+
+        print 'Saving it in the current directory with the layout %s..' % repr(layout)
+        G.layout(layout)
+        G.draw('./grap_coloring_z3_%s_colored.png' % name)
+        print '---'
     return 1
 
 if __name__ == '__main__':
