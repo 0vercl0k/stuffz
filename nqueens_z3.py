@@ -57,6 +57,7 @@ def nqueens(n):
     return recurse_nqueens(n, 0, [])
 
 def abs_z3(a):
+    """Get the absolute value of a Z3 variable"""
     return If(a >= 0, a, -a)
 
 def nqueens_constraint_programming(n):
@@ -96,7 +97,7 @@ def nqueens_constraint_programming_opti(n):
         for j in range(i + 1, n):
             s.add(columns[i] != columns[j])
             s.add(lines[i] != lines[j])
-            s.add(abs_z3(columns[i] - columns[j]) != abs_z3(lines[i] - lines[j]))
+            s.add(abs_z3(columns[i] - columns[j]) != abs(lines[i] - lines[j]))
 
     if s.check() == unsat:
         raise Exception('Unsat bitch')
