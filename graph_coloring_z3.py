@@ -29,6 +29,7 @@ def graph_coloring(graph):
     s = Solver()
     nodes_colors = dict((node_name, Int('k%r' % node_name)) for node_name in graph.nodes())
 
+    # We'll test if the graph is colorable with 1 then 2 then 3 ..colors until to find the correct number
     for i in range(1, graph.number_of_nodes()):
         for node in graph.nodes():
             s.add(nodes_colors[node] >= 0, nodes_colors[node] <= i)
@@ -42,8 +43,7 @@ def graph_coloring(graph):
             m = s.model()
             return dict((name, m[color].as_long()) for name, color in nodes_colors.iteritems())
 
-    print 'Could not find a solution.'
-    return None
+    raise Exception('Could not find a solution.')
 
 def build_peternson_3_coloring_graph():
     """Build http://en.wikipedia.org/wiki/File:Petersen_graph_3-coloring.svg"""
@@ -105,7 +105,7 @@ def main(argc, argv):
 
         print 'Saving it in the current directory with the layout %s..' % repr(layout)
         G.layout(layout)
-        G.draw('./grap_coloring_z3_%s_colored.png' % name)
+        G.draw('./graph_coloring_z3_%s_colored.png' % name)
         print '---'
     return 1
 
