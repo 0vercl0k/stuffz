@@ -307,7 +307,7 @@ BOOL write_shellcode_in_shared_section()
 
     if(result != STATUS_SUCCESS)
     {
-        printf("Failed: %.8x.\n", result);
+        printf("Failed in " __FUNCTION__ ": %.8x.\n", result);
         ret = FALSE;
         goto clean;
     }
@@ -330,7 +330,7 @@ BOOL write_shellcode_in_shared_section()
 
     if(result != STATUS_SUCCESS)
     {
-        printf("Failed: %.8x.\n", result);
+        printf("Failed in " __FUNCTION__ ": %.8x.\n", result);
         ret = FALSE;
         goto clean;
     }
@@ -362,7 +362,7 @@ BOOL modify_winproc_taskbar_window()
     printf("   Where are you Shell_TrayWnd, where are you..");
     if(hTaskbarWindow == 0)
     {
-        printf("Failed.\n");
+        printf("Failed in " __FUNCTION__ ".\n");
         ret = FALSE;
         goto clean;
     }
@@ -374,7 +374,7 @@ BOOL modify_winproc_taskbar_window()
 
     if(taskbarWinproc == 0)
     {
-        printf("Failed.\n");
+        printf("Failed in " __FUNCTION__ ".\n");
         ret = FALSE;
         goto clean;
     }
@@ -385,7 +385,7 @@ BOOL modify_winproc_taskbar_window()
     shellcode_address = get_shellcode_address();
     if(shellcode_address == 0)
     {
-        printf("Failed.\n");
+        printf("Failed in " __FUNCTION__ ".\n");
         ret = FALSE;
         goto clean;
     }
