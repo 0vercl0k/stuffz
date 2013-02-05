@@ -1,5 +1,5 @@
 /*
-    ms13-005-funz-poc.py - Drive a Medium IL cmd.exe via a Low IL process and message broadcasted
+    ms13-005-funz-poc.cpp - Drive a Medium IL cmd.exe via a Low IL process and message broadcasted
     Copyright (C) 2012 Axel "0vercl0k" Souchet - http://www.twitter.com/0vercl0k
 
     This program is free software: you can redistribute it and/or modify
