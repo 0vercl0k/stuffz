@@ -71,7 +71,8 @@ int main()
 
     wcscpy(hotpatch.PatcherName, DLL_PATCHER_NAME);
     hotpatch.a.PatcherNameOffset = sizeof(HOTPATCH);
-    hotpatch.a.PatcheeNameLen = DLL_PATCHER_NAME_SIZE;
+    // God, special thanks to @net__ninja (https://net-ninja.net/) bro who helped me to find that ******* typo #@!
+    hotpatch.a.PatcherNameLen = DLL_PATCHER_NAME_SIZE;
 
     wcscpy(hotpatch.PatcheeName, DLL_PATCHEE_NAME);
     hotpatch.a.PatcheeNameOffset = sizeof(HOTPATCH) + sizeof(hotpatch.PatcherName);
