@@ -185,7 +185,7 @@ def disassemble(co, name):
             else:
                 current_bbl = BasicBlock()
 
-    G = pgv.AGraph()
+    G = pgv.AGraph(directed = True) # Yeah, it's better oriented.
     G.graph_attr.update({
         'splines' : 'true',
         'label' : 'Control Flow Graph of: %s' % repr(name)
