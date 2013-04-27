@@ -103,6 +103,7 @@ def encrypt(s):
     return ''.join(chr((ord(c) + 1) & 0xff) for c in s)
 
 def opcodes_to_bytecode(opcodes):
+    """Kind of bytecode compiler \o/"""
     bytecode = ''
     for instr in opcodes:
         if instr[0] in opcode.opmap:
@@ -114,6 +115,7 @@ def opcodes_to_bytecode(opcodes):
     return bytecode
 
 def craft_pyc_via_func_object(function_object):
+    """Craft directly a .pyc file with your code object inside"""
     varnames = []
     code_object = function_object.func_code
     c = code_object.co_code
@@ -147,6 +149,7 @@ def craft_pyc_via_func_object(function_object):
         f.flush()
 
 def generate_random_strings():
+    """Generate a random string"""
     charset = map(chr, range(0, 0x100))
     return ''.join(random.choice(charset) for i in range(random.randint(10, 100)))
 
@@ -184,18 +187,16 @@ class UniqueList(list):
             self.append(i)
 
 def add_encryption_layer(f, number_layer):
-    """Add an encryption layer to the function f"""
+    """Add number_layer layers to the function f"""
     c = f.func_code
     original_bytecode = c.co_code
 
     encryption_marker = '\xBA\x0B\xBA\xBE'
-
     names = UniqueList(c.co_names)
     varnames = UniqueList(c.co_varnames)
     consts = UniqueList(c.co_consts)
     decryption_layers = []
     relocation_offset = 0
-
     absolute_jmp_infos = find_absolute_instr(original_bytecode)
 
     print '    Instructions with absolute offsets found in the original bytecode: %r' % absolute_jmp_infos
@@ -369,8 +370,8 @@ def add_encryption_layer(f, number_layer):
         relocation_offset += len(stub_decrypt_opcodes)
         decryption_layers.append(bytearray(stub_decrypt_opcodes))
 
-    # First, patch the *_ABSOLUTE in the original bytecode
-    # Note that original_relocated_bytecode is valid only when it will be prepended by the X layerz
+    # First, patch the absolute references in the original bytecode
+    # Note: the original_relocated_bytecode is valid only when it will be prepended by the X layerz
     print '    Relocate the original bytecode (size of all the stubs: %d bytes)' % relocation_offset
     original_relocated_bytecode = bytearray(original_bytecode)
 
