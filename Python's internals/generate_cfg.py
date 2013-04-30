@@ -177,7 +177,7 @@ def disassemble(co, name):
 
             # If the branchment instruction isn't a pure jump (non-conditionnal)
             # We also add an edge with the next futur BBL
-            if op not in map(lambda x: opcode.opmap[x], ['JUMP_ABSOLUTE', 'JUMP_FORWARD']):
+            if opcode.opname[op] not in ['JUMP_ABSOLUTE', 'JUMP_FORWARD']:
                 edges.append((current_bbl.start_address, i, color_branch_if_no_jmp))
 
             if i in nodes:
