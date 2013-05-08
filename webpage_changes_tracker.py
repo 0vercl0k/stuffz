@@ -25,6 +25,7 @@ import difflib
 import urllib2
 import time
 import smtplib
+import ConfigParser
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
@@ -93,8 +94,18 @@ class WebPageChangesTracker():
         if os.path.isfile(self.tracking_page_path) == False:
             # We need to grab the content of the page
             with open(self.tracking_page_path, 'w') as page:
-                data = urllib2.urlopen(self.url).read()
+                data = ''
+                do_we_raise = False
+                # If the website is not yet online, create a dumb file, this way you will be noticed
+                # when it will be up!
+                try:
+                    data = urllib2.urlopen(self.url).read()
+                except:
+                    do_we_raise = True
+
                 page.write(data)
+                if do_we_raise:
+                    raise Exception('Not online yet')
 
         # Now we need to have the SHA1 of the file, in order to find differences without diffing
         self.page_sha1 = self._get_page_sha1()
@@ -186,19 +197,44 @@ Have a nice day!''' % self.url
 def main(argc, argv):
     # It works perfectly with a little crontab entry:
     # */5 * * * * /home/overclok/scripts/webpage_changes_tracker.py
-    urls = [
-    ]
+    urls = map(
+        lambda s: s.strip(),
+        open('urls_to_track', 'r').readlines()
+    )
+
+    parser = ConfigParser.ConfigParser()
+    if len(parser.read('email_account.cfg')) == 0:
+        parser.add_section('smtp')
+        parser.add_section('notified')
+        parser.set('smtp', 'address', 'smtp.gmail.com')
+        parser.set('smtp', 'port', 445)
+        parser.set('smtp', 'username', 'testing@gmail.com')
+        parser.set('smtp', 'password', 'el8')
+        parser.set('notified', 'address', 'youraddress@gmail.com')
+        parser.write(open('email_account.cfg', 'w'))
+        print 'Fill your .cfg file now!'
+        return 0
 
     emailer = SMTPReportEmailer(
-        'smtp.gmail.com',
-        465,
-        'user',
-        'pwd'
+        parser.get('smtp', 'address'),
+        parser.getint('smtp', 'port'),
+        parser.get('smtp', 'username'),
+        parser.get('smtp', 'password')
     )
 
     for url in urls:
+        if url.startswith('#') or url == '':
+            continue
+
         print url
-        WebPageChangesTracker(url, emailer, 'dest@gmail.com').check()
+        try:
+            WebPageChangesTracker(
+                url,
+                emailer,
+                parser.get('notified', 'address')
+            ).check()
+        except Exception, e:
+            print '%s is not yet online (%r).' % (url, e)
 
     return 1
 
