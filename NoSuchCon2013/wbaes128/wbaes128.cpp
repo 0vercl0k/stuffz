@@ -15,7 +15,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
     
-    Kudos for @elvanderb for that really awesome-tough-motherfuckin-challenge.
+    Kudos to @elvanderb for that really awesome-tough-motherfuckin-challenge.
     @kutioo source of entropy since 1337.
 */
 #include <stdio.h>
