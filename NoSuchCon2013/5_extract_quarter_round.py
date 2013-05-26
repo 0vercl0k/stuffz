@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 #
-#    4_extract_quarter_round.py - NoSuchCon 2013 Extract a quarter of a round.
+#    5_extract_quarter_round.py - NoSuchCon 2013 Extract a quarter of a round.
 #    Copyright (C) 2013 Axel "0vercl0k" Souchet - http://www.twitter.com/0vercl0k
 #
 #    This program is free software: you can redistribute it and/or modify
