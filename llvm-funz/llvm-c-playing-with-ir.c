@@ -32,7 +32,7 @@ LLVMValueRef create_strlen_function(LLVMModuleRef *Module)
 
     LLVMBuilderRef Builder = LLVMCreateBuilder();
 
-    /// int strlen(char *);
+    /// 1. int strlen(char *);
     LLVMTypeRef StrlenArgsTyList[] = { LLVMPointerType(LLVMInt8Type(), 0) };
     LLVMTypeRef StrlenTy = LLVMFunctionType(
         LLVMInt32Type(),
@@ -51,15 +51,15 @@ LLVMValueRef create_strlen_function(LLVMModuleRef *Module)
     LLVMBasicBlockRef EndBasicBlock = LLVMAppendBasicBlock(StrlenFunction, "end");
 
     LLVMPositionBuilderAtEnd(Builder, InitBasicBlock);
-    /// int i = 0;
+    /// 2. int i = 0;
     LLVMValueRef i = LLVMBuildAlloca(Builder, LLVMInt32Type(), "i");
     LLVMBuildStore(Builder, Zero32, i);
 
     LLVMBuildBr(Builder, CheckBasicBlock);
 
-    /// check:
+    /// 3. check:
     LLVMPositionBuilderAtEnd(Builder, CheckBasicBlock);
-    /// if(s[i] == 0)
+    /// 4. if(s[i] == 0)
     LLVMValueRef id_if[] = { LLVMBuildLoad(Builder, i, "") };
     LLVMValueRef If = LLVMBuildICmp(
         Builder,
@@ -73,12 +73,12 @@ LLVMValueRef create_strlen_function(LLVMModuleRef *Module)
         ""
     );
 
-    ///     goto end;
+    /// 5.     goto end;
     LLVMBuildCondBr(Builder, If, BodyBasicBlock, EndBasicBlock);
 
-    /// body:
+    /// 6. body:
     LLVMPositionBuilderAtEnd(Builder, BodyBasicBlock);
-    /// i += 1;
+    /// 7. i += 1;
     LLVMValueRef id_i[] = { Zero32 };
     LLVMBuildStore(
         Builder,
@@ -95,12 +95,12 @@ LLVMValueRef create_strlen_function(LLVMModuleRef *Module)
         i
     );
 
-    /// goto check;
+    /// 8. goto check;
     LLVMBuildBr(Builder, CheckBasicBlock);
 
-    /// end:
+    /// 9. end:
     LLVMPositionBuilderAtEnd(Builder, EndBasicBlock);
-    /// return i;
+    /// 10. return i;
     LLVMBuildRet(Builder, LLVMBuildLoad(Builder, i, ""));
 
     return StrlenFunction;
@@ -175,7 +175,7 @@ void generate_ir_function()
         "printf"
     );
 
-    /// printf("len(World) = %d\n", strlen_llvm(hello));
+    /// 4. printf("len(World) = %d\n", strlen_llvm(hello));
     LLVMValueRef StrlenArgs[] = { World };
 
     PrintfArgs[0] = Format2;
@@ -195,7 +195,7 @@ void generate_ir_function()
         ""
     );
 
-    /// return;
+    /// 5. return;
     LLVMBuildRetVoid(Builder);
 
     /// Dump the IR we emited :)
