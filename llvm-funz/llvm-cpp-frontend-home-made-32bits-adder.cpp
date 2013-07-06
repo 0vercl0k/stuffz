@@ -75,7 +75,7 @@ llvm::Constant *add_extern_atoi_function(llvm::Module &mod)
     );
 }
 
-/// Generated via 
+/// Generated via generate_homemade_32bits_adder_llvm_ir.py
 void insert_32bits_adder(llvm::BasicBlock *bbl, llvm::Value *A, llvm::Value *B)
 {
     llvm::Instruction *LO_RShifted0 = llvm::BinaryOperator::CreateLShr(A, llvm::ConstantInt::get(Int32Ty, 0));
