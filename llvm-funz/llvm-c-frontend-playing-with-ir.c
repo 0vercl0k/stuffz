@@ -1,5 +1,6 @@
 /*
-    llvm-c-playing-with-ir.c - Trying out the LLVM-C API to emit IR code.
+    llvm-c-frontend-playing-with-ir.c - Trying out the LLVM-C API to emit IR code.
+    (successfuly tested with LLVM and clang 3.3)
     Copyright (C) 2013 Axel "0vercl0k" Souchet - http://www.twitter.com/0vercl0k
 
     This program is free software: you can redistribute it and/or modify
@@ -16,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Compile with:
-    clang++ -x c llvm-c-playing-with-ir.c `llvm-config --cxxflags --ldflags --libs` -o ./llvm-c-playing-with-ir
+    clang++ -x c llvm-c-frontend-playing-with-ir.c `llvm-config --cxxflags --ldflags --libs` -o ./llvm-c-frontend-playing-with-ir
 */
 #include <stdio.h>
 #include <stdlib.h>
