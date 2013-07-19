@@ -33,7 +33,7 @@ def Instruction(type_, name, LO, RO, nindent = 4):
     }
     assert(type_ in types.keys())
 
-    instr = '%sllvm::Instruction *%s = llvm::BinaryOperator::Create%s(%s, %s);' % (
+    instr = '%sllvm::Instruction *%s = llvm::BinaryOperator::Create%s(%s, %s, "", bbl);' % (
         ' ' * nindent,
         name,
         types[type_],
@@ -41,11 +41,6 @@ def Instruction(type_, name, LO, RO, nindent = 4):
         RO
     )
 
-    instr += '\n'
-    instr += '%sbbl->getInstList().push_back(%s);' % (
-        ' ' * nindent,
-        name
-    )
     return instr
 
 def GetInt32(x):

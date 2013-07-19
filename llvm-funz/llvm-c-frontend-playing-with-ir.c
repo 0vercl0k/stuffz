@@ -201,6 +201,9 @@ void generate_ir_function()
 
     /// Dump the IR we emited :)
     LLVMDumpModule(Module);
+
+    /// Be clean!
+    LLVMDisposeModule(Module);
 }
 
 int main()
