@@ -60,17 +60,17 @@ llvm::Constant *add_extern_printf_function(llvm::Module &mod)
     );
 }
 
-llvm::Constant *add_extern_atoi_function(llvm::Module &mod)
+llvm::Constant *add_extern_atoll_function(llvm::Module &mod)
 {
-    //extern int atoi(char*);
-    std::vector<llvm::Type*> atoiArgs;
-    atoiArgs.push_back(PInt8Ty);
+    //extern long long atoll(char*);
+    std::vector<llvm::Type*> atollArgs;
+    atollArgs.push_back(PInt8Ty);
 
     return mod.getOrInsertFunction(
-        "atoi",
+        "atoll",
         llvm::FunctionType::get(
             Int32Ty,
-            atoiArgs,
+            atollArgs,
             false
         )
     );
@@ -1078,7 +1078,7 @@ int main()
 {
     /// 1. Add some libc functions: atoi & printf
     llvm::Constant *printfFunc = add_extern_printf_function(module);
-    llvm::Constant *atoiFunc = add_extern_atoi_function(module);
+    llvm::Constant *atollFunc = add_extern_atoll_function(module);
 
     /// 2. Define the function "unsigned int add(unsigned int, unsigned int)"
     std::vector<llvm::Type*> add_args;
@@ -1131,7 +1131,7 @@ int main()
     llvm::Value *fmt = builder.CreateGlobalStringPtr("Result: %u\n");
 
     llvm::Value *A = builder.CreateCall(
-        atoiFunc,
+        atollFunc,
         builder.CreateLoad(
             builder.CreateGEP(
                 argv,
@@ -1141,7 +1141,7 @@ int main()
     );
 
     llvm::Value *B = builder.CreateCall(
-        atoiFunc,
+        atollFunc,
         builder.CreateLoad(
             builder.CreateGEP(
                 argv,
