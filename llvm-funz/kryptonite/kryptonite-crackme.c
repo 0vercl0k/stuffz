@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <string.h>
-
 /*
 #
 #    kryptonite-crackme.c - Little crackme I used to demonstrate Kryptonite
@@ -20,6 +17,9 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 */
+
+#include <stdio.h>
+#include <string.h>
 
 int main(int argc, char* argv[])
 {
