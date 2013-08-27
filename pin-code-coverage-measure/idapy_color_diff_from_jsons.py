@@ -24,7 +24,7 @@ import idc
 import idaapi
 from collections import defaultdict
 
-def color(ea, nbins, c = 0xFF0000):
+def color(ea, nbins, c = 0):
     '''Color 'nbins' instructions starting from ea'''
     for _ in range(nbins):
         idaapi.del_item_color(ea)
