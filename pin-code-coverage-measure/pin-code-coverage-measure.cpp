@@ -17,12 +17,12 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
 #include <pin.h>
 #include <jansson.h>
 #include <map>
 #include <string>
 #include <iostream>
+
 
 /// Types
 typedef std::map<std::string, std::pair<ADDRINT, ADDRINT> > MODULE_BLACKLIST_T;
@@ -44,7 +44,6 @@ MODULE_BLACKLIST_T modules_blacklisted;
 BASIC_BLOCKS_INFO_T basic_blocks_info;
 // For each module loaded, we keep its name & start/end addresses
 MODULE_LIST_T module_list;
-
 
 
 /// Pintool arguments
@@ -87,8 +86,7 @@ bool is_module_should_be_blacklisted(const std::string &image_path)
     // If the path of a DLL matches one of the following string, the module won't be instrumented by Pin.
     // This way you can avoid instrumentation of Windows API.
     static char* path_to_blacklist[] = {
-        "C:\\Windows\\",
-        "D:\\Downloads\\vlc-2.0.8-win32\\vlc-2.0.8\\plugins"
+        "C:\\Windows\\"
         // "C:\\Windows\\system32\\",
         // "C:\\Windows\\WinSxS\\"
     };
@@ -111,9 +109,7 @@ bool is_address_has_been_already_instrumented(ADDRINT address)
 // who cares
 INT32 Usage()
 {
-    std::cerr << "This pintool allows you to generate a JSON report that will contain information like:" << std::endl <<
-            "the unique number of instructions executed, the address of each basic block executed (and the number it has been called)." << std::endl << std::endl;
-
+    std::cerr << "This pintool allows you to generate a JSON report that will contain the address of each basic block executed." << std::endl << std::endl;
     std::cerr << std::endl << KNOB_BASE::StringKnobSummary() << std::endl;
     return -1;
 }
