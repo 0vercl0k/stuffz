@@ -1,5 +1,4 @@
 /*
-
     pin-code-coverage-measure.cpp - Generate a JSON report with the address of
     each BBL executed.
     Copyright (C) 2013 Axel "0vercl0k" Souchet - http://www.twitter.com/0vercl0k
@@ -15,11 +14,7 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-    TODO:
-        - in wow64 process: blacklist the area where you have the JMP FAR: stub
-            
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.         
 */
 #include <pin.h>
 #include <jansson.h>
