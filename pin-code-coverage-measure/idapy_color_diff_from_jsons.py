@@ -26,18 +26,16 @@ from collections import defaultdict
 
 def color(ea, nbins, c):
     '''Color 'nbins' instructions starting from ea'''
-    colors = {
+    colors = defaultdict(int)
+    colors.update({
         'black' : 0x000000,
         'red' : 0x0000FF,
         'blue' : 0xFF0000,
         'green' : 0x00FF00
-    }
-    if c not in colors:
-        c = 'black'
-    c = colors[c]
+    })
     for _ in range(nbins):
         idaapi.del_item_color(ea)
-        idaapi.set_item_color(ea, c)
+        idaapi.set_item_color(ea, colors[c])
         ea += idc.ItemSize(ea)
 
 def main():
