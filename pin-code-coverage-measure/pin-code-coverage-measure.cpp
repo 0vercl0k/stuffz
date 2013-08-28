@@ -16,12 +16,17 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+    TODO:
+        - in wow64 process: blacklist the area where you have the JMP FAR: stub
+            
 */
 #include <pin.h>
 #include <jansson.h>
 #include <map>
 #include <string>
 #include <iostream>
+#include <set>
 
 
 /// Types
@@ -98,12 +103,6 @@ bool is_module_should_be_blacklisted(const std::string &image_path)
     return false;
 }
 
-// Walk the basic_blocks_info variable and check if the bbl has already been instrumented
-bool is_address_has_been_already_instrumented(ADDRINT address)
-{
-    return basic_blocks_info.count(address) > 0;
-}
-
 
 /// Instrumentation/Analysis functions
 // who cares
@@ -117,6 +116,8 @@ INT32 Usage()
 // Called right before the execution of each basic block with the number of instruction in arg.
 VOID PIN_FAST_ANALYSIS_CALL handle_basic_block(UINT32 number_instruction_in_bb, ADDRINT address_bb)
 {
+    // What's going on under the hood
+    // LOG("[ANALYSIS] BBL Address: " + hexstr(address_bb) + "\n");
     basic_blocks_info[address_bb] = number_instruction_in_bb;
     instruction_counter += number_instruction_in_bb;
 }
@@ -127,9 +128,12 @@ VOID trace_instrumentation(TRACE trace, VOID *v)
     for(BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl))
     {
         // We don't want to instrument the BBL contained in the Windows API
-        if(is_address_in_blacklisted_modules(BBL_Address(bbl)) || is_address_has_been_already_instrumented(BBL_Address(bbl)))
+        if(is_address_in_blacklisted_modules(BBL_Address(bbl)))
             continue;
 
+        // What's going on under the hood
+        // LOG("[INSTRU] BBL Address: " + hexstr(BBL_Address(bbl)) + ", " + hexstr(BBL_NumIns(bbl)) + ", " + hexstr(BBL_)\n");
+        
         // Insert a call to handle_basic_block before every basic block, passing the number of instructions
         BBL_InsertCall(
             bbl,
@@ -140,7 +144,9 @@ VOID trace_instrumentation(TRACE trace, VOID *v)
             IARG_UINT32,
             BBL_NumIns(bbl),
 
-            IARG_INST_PTR, // The address of the instrumented instruction.
+            IARG_ADDRINT,
+            BBL_Address(bbl),
+
             IARG_END
         );
     }
@@ -281,6 +287,20 @@ int main(int argc, char *argv[])
         0,
         0,
         NULL
+    );
+
+    // If we are in a wow64 process we must blacklist manually the JMP FAR: stub
+    // from being instrumented (each time a syscall is called, it will be instrumented for *nothing*)
+    // Its address is in FS:[0xC0] on Windows 7
+    ADDRINT wow64stub = __readfsdword(0xC0);
+    modules_blacklisted.insert(
+        std::make_pair(
+            std::string("wow64stub"),
+            std::make_pair(
+                wow64stub,
+                wow64stub
+            )
+        )
     );
 
     /// FIRE IN THE HOLE

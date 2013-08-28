@@ -24,18 +24,31 @@ import idc
 import idaapi
 from collections import defaultdict
 
-def color(ea, nbins, c = 0):
+def color(ea, nbins, c):
     '''Color 'nbins' instructions starting from ea'''
+    colors = {
+        'black' : 0x000000,
+        'red' : 0x0000FF,
+        'blue' : 0xFF0000,
+        'green' : 0x00FF00
+    }
+    if c not in colors:
+        c = 'black'
+    c = colors[c]
     for _ in range(nbins):
         idaapi.del_item_color(ea)
         idaapi.set_item_color(ea, c)
         ea += idc.ItemSize(ea)
 
 def main():
-    report = json.load(open(r'D:\Codes\pin-code-coverage-measure\vlc_1.json'))
+    f = open(idc.AskFile(0, '*.json', 'Where is the first JSON report you want to load ?'), 'r')
+    report = json.load(f)
     l1 = report['basic_blocks_info']['list']
-    report = json.load(open(r'D:\Codes\pin-code-coverage-measure\vlc_2.json'))
+
+    f = open(idc.AskFile(0, '*.json', 'Where is the second JSON report you want to load ?'), 'r')
+    report = json.load(f)
     l2 = report['basic_blocks_info']['list']
+    c = idc.AskStr('black', 'Which color do you want ?').lower()
 
     addresses_l1 = set(r['address'] for r in l1)    
     addresses_l2 = set(r['address'] for r in l2)
@@ -51,7 +64,7 @@ def main():
     funcs = defaultdict(list)
     for i in diff:
         try:
-            color(i, dic_l2[i])
+            color(i, dic_l2[i], c)
             funcs[get_func(i).startEA].append(i)
         except Exception, e:
             print 'fail %s' % str(e)

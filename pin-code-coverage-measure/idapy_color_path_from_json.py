@@ -23,22 +23,33 @@ import json
 import idc
 import idaapi
 
-def color(ea, nbins, c = 0):
+def color(ea, nbins, c):
     '''Color 'nbins' instructions starting from ea'''
+    colors = {
+        'black' : 0x000000,
+        'red' : 0x0000FF,
+        'blue' : 0xFF0000,
+        'green' : 0x00FF00
+    }
+    if c not in colors:
+        c = 'black'
+    c = colors[c]
     for _ in range(nbins):
         idaapi.del_item_color(ea)
         idaapi.set_item_color(ea, c)
         ea += idc.ItemSize(ea)
 
 def main():
-    report = json.load(open(r'D:\Codes\pin-code-coverage-measure\test.json'))
+    f = open(idc.AskFile(0, '*.json', 'Where is the JSON report you want to load ?'), 'r')
+    c = idc.AskStr('black', 'Which color do you want ?').lower()
+    report = json.load(f)
     for i in report['basic_blocks_info']['list']:
         print '%x' % i['address'],
         try:
-            color(i['address'], i['nbins'])
+            color(i['address'], i['nbins'], c)
             print 'ok'
-        except:
-            print 'fail'
+        except Exception, e:
+            print 'fail: %s' % str(e)
     print 'done'    
     return 1
 
