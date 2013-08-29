@@ -28,7 +28,6 @@
 typedef std::map<std::string, std::pair<ADDRINT, ADDRINT> > MODULE_BLACKLIST_T;
 typedef MODULE_BLACKLIST_T MODULE_LIST_T;
 typedef std::map<ADDRINT, UINT32> BASIC_BLOCKS_INFO_T;
-typedef std::map<std::pair<AFUNPTR, std::string>, UINT32> ROUTINES_INFO_T;
 
 
 ///Globals
@@ -36,8 +35,6 @@ typedef std::map<std::pair<AFUNPTR, std::string>, UINT32> ROUTINES_INFO_T;
 UINT64 instruction_counter = 0;
 // The number of threads
 UINT64 thread_counter = 0;
-// The total number of modules that has been loaded in the program
-UINT64 module_counter = 0; 
 // This is the list of the blacklisted module ; you can find their names & start/end addresses
 MODULE_BLACKLIST_T modules_blacklisted;
 // For each bbl executed, we store its address and its number of instruction
@@ -120,12 +117,12 @@ VOID PIN_FAST_ANALYSIS_CALL handle_basic_block(UINT32 number_instruction_in_bb, 
 // We have to instrument traces in order to instrument each BBL, the API doesn't have a BBL_AddInstrumentFunction
 VOID trace_instrumentation(TRACE trace, VOID *v)
 {
+    // We don't want to instrument the BBL contained in the Windows API
+    if(is_address_in_blacklisted_modules(TRACE_Address(trace)))
+        return;
+
     for(BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl))
     {
-        // We don't want to instrument the BBL contained in the Windows API
-        if(is_address_in_blacklisted_modules(BBL_Address(bbl)))
-            continue;
-
         // What's going on under the hood
         // LOG("[INSTRU] BBL Address: " + hexstr(BBL_Address(bbl)) + ", " + hexstr(BBL_NumIns(bbl)) + ", " + hexstr(BBL_)\n");
         
@@ -166,7 +163,6 @@ VOID image_instrumentation(IMG img, VOID * v)
     );
 
     module_list.insert(module_info);
-    module_counter++;
 
     if(is_module_should_be_blacklisted(image_path))
         modules_blacklisted.insert(module_info);
@@ -210,10 +206,10 @@ VOID save_instrumentation_infos()
     json_t *modules = json_object();
     json_t *modules_list_ = json_array();
     // unique_count field
-    json_object_set_new(modules, "unique_count", json_integer(module_counter));
+    json_object_set_new(modules, "unique_count", json_integer(module_list.size()));
     // list field
     json_object_set_new(modules, "list", modules_list_);
-    for(MODULE_BLACKLIST_T::const_iterator it = modules_blacklisted.begin(); it != modules_blacklisted.end(); ++it)
+    for(MODULE_BLACKLIST_T::const_iterator it = module_list.begin(); it != module_list.end(); ++it)
     {
         json_t *mod_info = json_object();
         json_object_set_new(mod_info, "path", json_string(it->first.c_str()));
