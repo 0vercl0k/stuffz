@@ -17,6 +17,8 @@
 
     @taviso did all the job, I just followed its blogpost:
       -> http://blog.cmpxchg8b.com/2013/02/a-few-years-ago-while-working-on.html -- amazing.
+    
+    Btw, a small video has been made, it's here: http://download.tuxfamily.org/overclokblog/ms13-005-funz/
 
     Cool trick:
       -> If you want to set this process to a low IL you can use:
