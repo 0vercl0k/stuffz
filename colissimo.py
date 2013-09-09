@@ -22,6 +22,8 @@
 import sys
 import urllib2
 import urllib
+import time
+import winsound
 from bs4 import BeautifulSoup
 
 def main(argc, argv):
@@ -29,16 +31,28 @@ def main(argc, argv):
         print './colissimo.py <ID>'
         return 0
 
-    soup = BeautifulSoup(
-        urllib2.urlopen(
-            urllib2.Request(
-                'http://www.colissimo.fr/portail_colissimo/suivre.do?language=fr_FR',
-                urllib.urlencode({ 'parcelnumber' : argv[1] })
-            )
-        ).read()
-    )
+    data = None
+    while True:
+        soup = BeautifulSoup(
+            urllib2.urlopen(
+                urllib2.Request(
+                    'http://www.colissimo.fr/portail_colissimo/suivre.do?language=fr_FR',
+                    urllib.urlencode({ 'parcelnumber' : argv[1] })
+                )
+            ).read()
+        )
 
-    print soup.find(id = 'resultatSuivreDiv').div.text
+        x = soup.find(id = 'resultatSuivreDiv').div.text.strip()
+        if data == None:
+            print 'Init: "%s"' % x
+            data = x
+        else:
+            if x != data:
+                print 'New change: %s' % x
+                data = x
+                winsound.PlaySound(r'C:\Windows\Media\Afternoon\Windows Logon Sound.wav', winsound.SND_FILENAME)
+
+        time.sleep(15 * 60)
     return 1
 
 if __name__ == '__main__':
