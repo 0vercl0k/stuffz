@@ -20,36 +20,56 @@
 #
 
 import sys
-import urllib2
-import urllib
+import requests
 import time
+import os
 import winsound
+from subprocess import check_output
 from bs4 import BeautifulSoup
+
+def gocr_file(inf):
+    '''using convert.exe from ImageMagick, and gocr.exe to extract the info'''
+    return check_output('convert.exe "%s" pnm:- | gocr049.exe -' % inf, shell = True)
 
 def main(argc, argv):
     if argc != 2:
         print './colissimo.py <ID>'
         return 0
 
+    url_base = 'http://www.colissimo.fr/portail_colissimo/'
     data = None
-    while True:
-        soup = BeautifulSoup(
-            urllib2.urlopen(
-                urllib2.Request(
-                    'http://www.colissimo.fr/portail_colissimo/suivre.do?language=fr_FR',
-                    urllib.urlencode({ 'parcelnumber' : argv[1] })
-                )
-            ).read()
-        )
 
-        x = soup.find(id = 'resultatSuivreDiv').div.text.strip()
-        if data == None:
-            print 'Init: "%s"' % x
-            data = x
+    while True:
+        r = requests.post(
+            '%ssuivre.do?language=fr_FR' % url_base,
+            { 'parcelnumber' : argv[1] }
+        )
+        soup = BeautifulSoup(r.text)
+        x = soup.find(id = 'resultatSuivreDiv')
+        error = x.find('div', **{'class' : 'error'})
+        if error != None:
+            info = error.text.strip()
         else:
-            if x != data:
-                print 'New change: %s' % x
-                data = x
+            info = []
+            for i in ['Date', 'Libelle', 'site']:
+                img_url = url_base + x.find('td', headers = i).img['src']
+                with open('tmp.png', 'wb') as f:
+                    f.write(requests.get(img_url, cookies = r.cookies).content)
+                c = gocr_file('tmp.png').strip().replace('\r\n', ' ')
+                if i == 'Date':
+                    c = c.replace('I', '/').replace('O', '0')
+                info.append('%s: %s' % (i, c))
+                os.remove('tmp.png')
+
+            info = ', '.join(info)
+
+        if data == None:
+            data = info
+            print 'Init: "%s"' % data
+        else:
+            if info != data:
+                data = info
+                print 'New change: %s' % data
                 winsound.PlaySound(r'C:\Windows\Media\Afternoon\Windows Logon Sound.wav', winsound.SND_FILENAME)
 
         time.sleep(15 * 60)
