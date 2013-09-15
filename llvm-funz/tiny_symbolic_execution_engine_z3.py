@@ -21,9 +21,17 @@
 #
 
 import sys
-sys.path.append(r'C:\Program Files (x86)\Microsoft Research\Z3-4.1\bin')
+sys.path.append(r'C:\Program Files (x86)\z3-430\bin')
 from z3 import *
 from idc import *
+
+def prove(f):
+    '''Taken from http://rise4fun.com/Z3Py/tutorialcontent/guide#h26'''
+    s = Solver()
+    s.add(Not(f))
+    if s.check() == unsat:
+        return True
+    return False
 
 class Disassembler(object):
     '''A simple class to decode easily instruction in IDA'''
@@ -115,11 +123,14 @@ class SymbolicExecutionEngine(object):
         # Each equation must have a unique id
         self.idx = 0
 
+        # The symbolic variables will be stored there
+        self.sym_variables = []
+
         # Each equation will be stored here
         self.equations = {}
 
     def _check_if_reg32(self, r):
-        '''XXX: make a decorator'''
+        '''XXX: make a decorator?'''
         return r.lower() in self.ctx
 
     def _push_equation(self, e):
@@ -147,10 +158,14 @@ class SymbolicExecutionEngine(object):
                 if src in self.ctx and dst in self.ctx:
                     self.ctx[dst] = self.ctx[src]
                 # mov reg32, [mem]
-                elif src.find('var_') != -1 and dst in self.ctx:
+                elif (src.find('var_') != -1 or src.find('arg') != -1) and dst in self.ctx:
                     if src not in self.mem:
-                        raise Exception('An non-initialized location (%r) is trying to be read' % src)
-
+                        # A non-initialized location is trying to be read, we got a symbolic variable!
+                        sym = BitVec('arg%d' % len(self.sym_variables), 32)
+                        self.sym_variables.append(sym)
+                        print 'Trying to read a non-initialized area, we got a new symbolic variable: %s' % sym
+                        self.mem[src] = self._push_equation(sym)
+                    
                     self.ctx[dst] = self.mem[src]
                 # mov [mem], reg32
                 elif dst.find('var_') != -1 and src in self.ctx:
@@ -206,36 +221,24 @@ class SymbolicExecutionEngine(object):
                 print mnemonic, dst, src
                 raise Exception('This instruction is not handled.')
 
+    def _simplify_additions(self, eq):
+        '''The idea in this function is to help Z3 to simplify our big bitvec-arithmetic
+        expression. It's simple, in eq we have a big expression with two symbolic variables (arg0 & arg1)
+        and a lot of bitvec arithmetic. Somehow, the simplify function is not clever enough to reduce the
+        equation.
 
-def simplify_additions(eq):
-    '''The idea in this function is to help Z3 to simplify our big bitvec-arithmetic
-    expression. It's simple, in eq we have a big expression with two symbolic variables (arg0 & arg1)
-    and a lot of bitvec arithmetic.
+        The idea here is to use the prove function in order to see if we can simplify an equation by an addition of the
+        symbolic variables.'''
+        # The two expressions are equivalent ; we got a simplification!
+        if prove(Sum(self.sym_variables) == eq):
+            return BitVec('arg0', 32) + BitVec('arg1', 32)
 
-    We substitute each symbolic variables by the value 0, thus obtaining a constant value.
-    The idea is now to check if we can find values for arg0 & arg1 which sat this equation:
-        cst + arg0 + arg1 != eq
+        return eq
 
-    If this equation is not sat, it means those equations are equivalent, we got a simplification possible.
-    Special thanks to my nasty-monkey @elvanderb for that :).'''
-    cst = simplify(
-        substitute(
-            eq,
-            (BitVec('arg0', 32), BitVecVal(0, 32)),
-            (BitVec('arg1', 32), BitVecVal(0, 32))
-        )
-    )
-
-    s = Solver()
-    s.add(cst + BitVec('arg0', 32) + BitVec('arg1', 32) != eq)
-
-    # In that case, it means that cst + arg0 + arg1 != eq isn't sat
-    # Long story short, the two expressions are equivalent ; we got a simplification!
-    if s.check() == unsat:
-        # print 'WIN!'
-        return cst + BitVec('arg0', 32) + BitVec('arg1', 32)
-
-    return eq
+    def get_reg_equation_simplified(self, reg):
+        eq = self.get_reg_equation(reg)
+        eq = self._simplify_additions(eq)
+        return eq
 
 
 def main():
@@ -243,24 +246,12 @@ def main():
     I talked about in "Obfuscation of steel: meet my Kryptonite." : http://0vercl0k.tuxfamily.org/bl0g/?p=260.
 
     The idea is to defeat those obfuscations using a tiny symbolic execution engine.'''
-    sym = SymbolicExecutionEngine(0x8048468, 0x0804A17C)
-
-    # Here we are cheating, we are finding the symbolic variables by hands.
-    # That process could be done automatically by using data-tainting (instanciate a symbolic variable
-    # each time we got a read access on a non-initialized memory)
-    arg0 = BitVec('arg0', 32)
-    arg1 = BitVec('arg1', 32)
-    # .text:0804845A                 mov     eax, [esp+3DCh+arg_4]
-    # .text:08048461                 mov     ecx, [esp+3DCh+arg_0]
-    sym.set_reg_with_equation('eax', arg1)
-    sym.set_reg_with_equation('ecx', arg0)
-
+    sym = SymbolicExecutionEngine(0x804845A, 0x0804A17C)
     print 'Launching the engine..'
     sym.run()
-    print 'Done, retrieving the equation in EAX'
-    eax = sym.get_reg_equation('eax')
-    print 'Done, now simplifying it..'
-    print simplify(simplify_additions(eax))
+    print 'Done, retrieving the equation in EAX, and simplifying..'
+    eax = sym.get_reg_equation_simplified('eax')
+    print eax
     return 1
 
 if __name__ == '__main__':
