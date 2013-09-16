@@ -197,7 +197,8 @@ void turing_machine_simple()
     // |05|
     // +--+
 
-    unsigned int *mem = (unsigned int*)malloc(0x1000);
+    ///// SETUP THE MACHINE
+    unsigned int *mem = (unsigned int*)malloc(3 * sizeof(unsigned int));
     printf("OK, mem allocated @ %p\n", mem);
 
     unsigned int S0 = (unsigned int)mem;
@@ -440,9 +441,7 @@ void turing_machine_simple()
     // The register L holds the address N, and R holds the address T2
     L = (unsigned int)cell1;
     R = (unsigned int)cell3;
-    // X = eax
-    // Y = ebx
-    // M = ecx
+    ///// LAUNCH THE MACHINE
     __try
     {
         here_we_go:
