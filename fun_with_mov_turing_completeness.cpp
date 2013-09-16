@@ -546,7 +546,7 @@ void turing_machine_simple()
             mov S, edx
             mov edx, [edx + 4]      ;; get new start of L or R
             mov [ebx], edx          ;; select new value of L
-            ; WARNING: I believe this is a typo in the reference paper ; instead of 'mov edi, R', it is 'mov edi, L'
+            ; WARNING: I believe this is a typo in the reference paper ; instead of 'mov edi, R', it is 'mov edi, L' (confirmed with the author)
             mov edi, L
             mov [ebx + 4], edi
             mov edi, [ebx + eax * 4]
