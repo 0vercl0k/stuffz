@@ -20,7 +20,7 @@
         clang++ llvm-functionpass-kryptonite-obfuscater.cpp `llvm-config --cxxflags --ldflags --libs core` -shared -o llvm-functionpass-kryptonite-obfuscater.so
     Use it with:
         clang -S -emit-llvm hello.c -o hello.ll # Generate LLVM IR (readable) file
-        opt -S -load ~/dev/llvm-functionpass-kryptonite-obfuscater.so -kryptonite -enable-anti-dbg -n-passes 2 -heavy-add-obfu hello.ll -o hello.obfu.ll
+        opt -S -load ~/dev/llvm-functionpass-kryptonite-obfuscater.so -kryptonite -enable-anti-dbg -heavy-add-obfu hello.ll -o hello.obfu.ll
         llc -march=archdesired -filetype=obj -O0 hello.obfu.ll -o hello.obfu.o
         clang hello.obfu.o -o hello
 

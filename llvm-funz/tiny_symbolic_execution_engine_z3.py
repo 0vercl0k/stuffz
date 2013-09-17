@@ -25,13 +25,20 @@ sys.path.append(r'C:\Program Files (x86)\z3-430\bin')
 from z3 import *
 from idc import *
 
-def prove(f):
+def prove_(f):
     '''Taken from http://rise4fun.com/Z3Py/tutorialcontent/guide#h26'''
     s = Solver()
     s.add(Not(f))
     if s.check() == unsat:
         return True
     return False
+
+class EquationId(object):
+    def __init__(self, id_):
+        self.id = id_
+
+    def __repr__(self):
+        return 'EID:%d' % self.id
 
 class Disassembler(object):
     '''A simple class to decode easily instruction in IDA'''
@@ -74,6 +81,7 @@ class SymbolicExecutionEngine(object):
             . mov reg32, reg32
             . mov reg32, [mem]
             . mov [mem], reg32
+            . mov reg32, cst
         . shr:
             . shr reg32, cst
         . shl:
@@ -87,11 +95,12 @@ class SymbolicExecutionEngine(object):
             . or reg32, reg32
         . add:
             . add reg32, reg32
+            . add reg32, cst
 
     We also don't care about:
         . EFLAGS
         . branches
-        . register smaller, greater than 32 bits
+        . smaller registers (16/8 bits)
     Long story short: it's perfect ; that environment makes really easy to play with symbolic execution.'''
     def __init__(self, start, end):
         # This is the CPU context at each time
@@ -129,14 +138,18 @@ class SymbolicExecutionEngine(object):
         # Each equation will be stored here
         self.equations = {}
 
+        # Number of instructions emulated
+        self.ninstrs = 0
+
     def _check_if_reg32(self, r):
         '''XXX: make a decorator?'''
         return r.lower() in self.ctx
 
     def _push_equation(self, e):
-        self.equations[self.idx] = e
+        idx = EquationId(self.idx)
+        self.equations[idx] = e
         self.idx += 1
-        return (self.idx - 1)
+        return idx
 
     def set_reg_with_equation(self, r, e):
         if self._check_if_reg32(r) == False:
@@ -148,14 +161,25 @@ class SymbolicExecutionEngine(object):
         if self._check_if_reg32(r) == False:
             return
 
-        return self.equations[self.ctx[r]]
+        if isinstance(self.ctx[r], EquationId):
+            return self.equations[self.ctx[r]]
+        else:
+            return self.ctx[r]
 
     def run(self):
         '''Run from start address to end address the engine'''
         for mnemonic, dst, src in self.disass.get_next_instruction():
+            if (self.ninstrs % 5000) == 0 and self.ninstrs > 0:
+                print '%d instructions, %d equations so far...' % (self.ninstrs, len(self.equations))
+            # print mnemonic, dst, src
+            # print self.ctx
+            # print self.equations
             if mnemonic == 'mov':
+                # mov reg32, imm32
+                if dst in self.ctx and isinstance(src, (int, long)):
+                    self.ctx[dst] = src
                 # mov reg32, reg32
-                if src in self.ctx and dst in self.ctx:
+                elif src in self.ctx and dst in self.ctx:
                     self.ctx[dst] = self.ctx[src]
                 # mov reg32, [mem]
                 elif (src.find('var_') != -1 or src.find('arg') != -1) and dst in self.ctx:
@@ -169,28 +193,24 @@ class SymbolicExecutionEngine(object):
                     self.ctx[dst] = self.mem[src]
                 # mov [mem], reg32
                 elif dst.find('var_') != -1 and src in self.ctx:
-                    if dst not in self.mem:
-                        self.mem[dst] = None
-
                     self.mem[dst] = self.ctx[src]
                 else:
                     raise Exception('This encoding of "mov" is not handled.')
             elif mnemonic == 'shr':
                 # shr reg32, cst
-                if dst in self.ctx and type(src) == int:
-                    self.set_reg_with_equation(dst, LShR(self.get_reg_equation(dst), src))
+                if dst in self.ctx and isinstance(src, (int, long)):
+                    self.set_reg_with_equation(dst, self.get_reg_equation(dst) >> src)
                 else:
                     raise Exception('This encoding of "shr" is not handled.')
             elif mnemonic == 'shl':
                 # shl reg32, cst
-                if dst in self.ctx and type(src) == int:
+                if dst in self.ctx and isinstance(src, (int, long)):
                     self.set_reg_with_equation(dst, self.get_reg_equation(dst) << src)
                 else:
                     raise Exception('This encoding of "shl" is not handled.')
             elif mnemonic == 'and':
-                x = None
                 # and reg32, cst
-                if type(src) == int:
+                if isinstance(src, (int, long)):
                     x = src
                 # and reg32, reg32
                 elif src in self.ctx:
@@ -201,8 +221,11 @@ class SymbolicExecutionEngine(object):
                 self.set_reg_with_equation(dst, self.get_reg_equation(dst) & x)
             elif mnemonic == 'xor':
                 # xor reg32, cst
-                if dst in self.ctx and type(src) == int:
-                    self.set_reg_with_equation(dst, self.get_reg_equation(dst) ^ src)
+                if dst in self.ctx and isinstance(src, (int, long)):
+                    if self.ctx[dst] not in self.equations:
+                        self.ctx[dst] ^= src
+                    else:
+                        self.set_reg_with_equation(dst, self.get_reg_equation(dst) ^ src)
                 else:
                     raise Exception('This encoding of "xor" is not handled.')
             elif mnemonic == 'or':
@@ -215,11 +238,16 @@ class SymbolicExecutionEngine(object):
                 # add reg32, reg32
                 if dst in self.ctx and src in self.ctx:
                     self.set_reg_with_equation(dst, self.get_reg_equation(dst) + self.get_reg_equation(src))
+                # add reg32, cst
+                elif dst in self.ctx and isinstance(src, (int, long)):
+                    self.set_reg_with_equation(dst, self.get_reg_equation(dst) + src)
                 else:
                     raise Exception('This encoding of "add" is not handled.')
             else:
                 print mnemonic, dst, src
                 raise Exception('This instruction is not handled.')
+
+            self.ninstrs += 1
 
     def _simplify_additions(self, eq):
         '''The idea in this function is to help Z3 to simplify our big bitvec-arithmetic
@@ -230,14 +258,14 @@ class SymbolicExecutionEngine(object):
         The idea here is to use the prove function in order to see if we can simplify an equation by an addition of the
         symbolic variables.'''
         # The two expressions are equivalent ; we got a simplification!
-        if prove(Sum(self.sym_variables) == eq):
-            return BitVec('arg0', 32) + BitVec('arg1', 32)
+        if prove_(Sum(self.sym_variables) == eq):
+            return Sum(self.sym_variables)
 
         return eq
 
     def get_reg_equation_simplified(self, reg):
         eq = self.get_reg_equation(reg)
-        eq = self._simplify_additions(eq)
+        eq = simplify(self._simplify_additions(eq))
         return eq
 
 
@@ -246,12 +274,16 @@ def main():
     I talked about in "Obfuscation of steel: meet my Kryptonite." : http://0vercl0k.tuxfamily.org/bl0g/?p=260.
 
     The idea is to defeat those obfuscations using a tiny symbolic execution engine.'''
-    sym = SymbolicExecutionEngine(0x804845A, 0x0804A17C)
+    # sym = SymbolicExecutionEngine(0x804845A, 0x0804A17C) # for simple adder
+    sym = SymbolicExecutionEngine(0x804823C, 0x08072284) # adder kryptonized
     print 'Launching the engine..'
     sym.run()
-    print 'Done, retrieving the equation in EAX, and simplifying..'
+    print 'Done. %d equations built, %d assembly lines emulated, %d virtual memory cells used' % (len(sym.equations), sym.ninstrs, len(sym.mem))
+    print 'CPU state at the end:'
+    print sym.ctx
+    print 'Retrieving and simplifying the EAX register..'
     eax = sym.get_reg_equation_simplified('eax')
-    print eax
+    print 'EAX=%r' % eax
     return 1
 
 if __name__ == '__main__':
