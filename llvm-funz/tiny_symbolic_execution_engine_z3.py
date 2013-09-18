@@ -171,9 +171,7 @@ class SymbolicExecutionEngine(object):
         for mnemonic, dst, src in self.disass.get_next_instruction():
             if (self.ninstrs % 5000) == 0 and self.ninstrs > 0:
                 print '%d instructions, %d equations so far...' % (self.ninstrs, len(self.equations))
-            # print mnemonic, dst, src
-            # print self.ctx
-            # print self.equations
+
             if mnemonic == 'mov':
                 # mov reg32, imm32
                 if dst in self.ctx and isinstance(src, (int, long)):
