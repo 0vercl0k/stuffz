@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
     if(arguments.size() > 0)
     {
         for(std::vector<std::string>::const_iterator it = arguments.begin(); it != arguments.end(); ++it)
-            DEBUGMSG("   - %s\n", (*it).c_str());
+            DEBUGMSG("   - %s\n", it->c_str());
     }
 
     DEBUGMSG("OK, spawning the process..\n");
