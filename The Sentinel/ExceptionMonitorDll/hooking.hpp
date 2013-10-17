@@ -34,7 +34,7 @@
 typedef VOID (NTAPI *KiUserExceptionDispatcher_t)(PEXCEPTION_RECORD ExceptionRecord, PCONTEXT Context);
 
 // kernel32.UnhandledExceptionFilter signature
-typedef LONG (WINAPI *UnhandledExceptionFilter_t)(struct _EXCEPTION_POINTERS *ExceptionInfo);
+// typedef LONG (WINAPI *UnhandledExceptionFilter_t)(struct _EXCEPTION_POINTERS *ExceptionInfo);
 
 /* Function declaration */
 // The hook of KiUserExceptionDispatcher: it aims to log all the exception happening in the process

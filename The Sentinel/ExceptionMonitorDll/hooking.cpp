@@ -35,23 +35,23 @@ KiUserExceptionDispatcher_t TrueKiUserExceptionDispatcher = (KiUserExceptionDisp
 );
 
 // The address of the real kernel32.UnhandledExceptionFilter
-UnhandledExceptionFilter_t TrueUnhandledExceptionFilter = (UnhandledExceptionFilter_t)DetourFindFunction(
-    "kernel32.dll",
-    "UnhandledExceptionFilter"
-);
+// UnhandledExceptionFilter_t TrueUnhandledExceptionFilter = (UnhandledExceptionFilter_t)DetourFindFunction(
+//    "kernel32.dll",
+//    "UnhandledExceptionFilter"
+// );
 
 extern CRITICAL_SECTION critical_section;
 
-LONG WINAPI UnhandledExceptionFilter_(struct _EXCEPTION_POINTERS *ExceptionInfo)
-{
-    /* If we reached there, it is a good (good for us, bad for the coder/program :)) sign, report it! */
-    EnterCriticalSection(&critical_section);
-    log_exception(ExceptionInfo->ExceptionRecord, ExceptionInfo->ContextRecord);
-    LeaveCriticalSection(&critical_section);
+// LONG WINAPI UnhandledExceptionFilter_(struct _EXCEPTION_POINTERS *ExceptionInfo)
+// {
+//     /* If we reached there, it is a good (good for us, bad for the coder/program :)) sign, report it! */
+//     EnterCriticalSection(&critical_section);
+//     log_exception(ExceptionInfo->ExceptionRecord, ExceptionInfo->ContextRecord);
+//     LeaveCriticalSection(&critical_section);
 
-    TerminateProcess(GetCurrentProcess(), 0);
-    return 0;
-}
+//     TerminateProcess(GetCurrentProcess(), 0);
+//     return 0;
+// }
 
 VOID __declspec(naked) NTAPI KiUserExceptionDispatcher(PEXCEPTION_RECORD ExceptionRecord, PCONTEXT Context)
 {
@@ -107,11 +107,13 @@ VOID SetHook()
     
         Solution:
         Hook the kernel32.UnhandledExceptionFilter (will be called by _report_gs_failure or by the program itself (?) but only if everything goes wrong, so good for us.)
+
+        Update: That doesn't work anymore cf http://doar-e.github.io/blog/2013/10/12/having-a-look-at-the-windows-userkernel-exceptions-dispatcher/
     */
-    DetourAttach(
-        (PVOID*)&TrueUnhandledExceptionFilter,
-        UnhandledExceptionFilter_
-    );
+    // DetourAttach(
+    //     (PVOID*)&TrueUnhandledExceptionFilter,
+    //     UnhandledExceptionFilter_
+    // );
 
     DetourTransactionCommit();
 }
@@ -126,10 +128,10 @@ VOID UnsetHook()
         KiUserExceptionDispatcher
     );
     
-    DetourDetach(
-        (PVOID*)&TrueUnhandledExceptionFilter,
-        UnhandledExceptionFilter_
-    );
+    // DetourDetach(
+    //     (PVOID*)&TrueUnhandledExceptionFilter,
+    //     UnhandledExceptionFilter_
+    // );
 
     DetourTransactionCommit();
 }
