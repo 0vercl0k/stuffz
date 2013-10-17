@@ -83,7 +83,7 @@ int main(int argc, char* argv[])
 {
     if(argc < 3)
     {
-        printf("Usage: ./ProcessSpwaner <full path dll> <path executable> [args..]");
+        printf("Usage: ./ProcessSpawner <full path dll> <path executable> [args..]");
         return EXIT_FAILURE;
     }
 
