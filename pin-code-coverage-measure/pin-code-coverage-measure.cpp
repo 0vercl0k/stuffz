@@ -124,7 +124,7 @@ VOID trace_instrumentation(TRACE trace, VOID *v)
     for(BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl))
     {
         // What's going on under the hood
-        // LOG("[INSTRU] BBL Address: " + hexstr(BBL_Address(bbl)) + ", " + hexstr(BBL_NumIns(bbl)) + ", " + hexstr(BBL_)\n");
+        // LOG("[INSTRU] BBL Address: " + hexstr(BBL_Address(bbl)) + ", " + hexstr(BBL_NumIns(bbl)) + "\n");
         
         // Insert a call to handle_basic_block before every basic block, passing the number of instructions
         BBL_InsertCall(
