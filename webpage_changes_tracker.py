@@ -148,7 +148,12 @@ class WebPageChangesTracker():
     def check(self):
         """Check if the content has been changed"""
         # First step is to get the url
-        new_data = urllib2.urlopen(self.url).read()
+        req = urllib2.Request(
+            self.url,
+            None,
+            { 'User-Agent' : 'Mozilla/5.0' }
+        )
+        new_data = urllib2.urlopen(req).read()
 
         # Now we compute its sha1
         data_sha1 = sha1(new_data).digest()
