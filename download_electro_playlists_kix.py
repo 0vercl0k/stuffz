@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 #
-#    rip_electro_playlists.py - Don't let the bass get ya!
+#    download_electro_playlists_kix.py - Don't let the bass get ya!
 #    Copyright (C) 2013 Axel "0vercl0k" Souchet - http://www.twitter.com/0vercl0k
 #
 #    This program is free software: you can redistribute it and/or modify
