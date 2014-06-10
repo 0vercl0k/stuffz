@@ -25,7 +25,7 @@ import os
 import shutil
 
 def main(argc, argv):
-    pin_root = r'D:\Codes\Pin\pin-2.12-58423-msvc10-windows'
+    pin_root = r'D:\Codes\Pin\pin-2.13-65163-msvc11-windows'
     project_root = r'D:\Codes'
 
     if argc != 2:
