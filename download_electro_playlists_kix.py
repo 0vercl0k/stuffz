@@ -71,7 +71,7 @@ def main(argc, argv):
                 j.replace('soundFile', '"soundFile"').replace(');', '')
             )['soundFile']
         )
-        path = urlparse(link).path
+        path = urlparse(link).path.encode('ascii', 'ignore')
         filename = path[path.rfind('/') + 1 :]
         download(argv[2], filename, link)
     return 1
