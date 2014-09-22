@@ -27,7 +27,7 @@ def part1():
 def part2():
     global True
     if True != 3:
-        True = True - 1
+        True -= 1
     else:
         quarkslab.append(
             ''.join(
