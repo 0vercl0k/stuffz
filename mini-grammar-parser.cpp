@@ -68,6 +68,8 @@ std::string MiniGrammarParser::generate_(std::shared_ptr<Rule> &rule)
         // Here we can handle specific strings if we need so
         if (rule->name == "\\n")
             ss << std::endl;
+        else if (rule->name == "\\t")
+            ss << "\t";
         else
             ss << rule->name;
     }
