@@ -76,33 +76,33 @@
 class MiniGrammarParser
 {
 public:
-	struct Rule
-	{
-		enum type
-		{
-			RuleChoice,
-			RuleConcatenation,
-			RuleStar,
-			RuleString,
-			RuleSymbolName,
-		} type;
-		std::string name;
-		std::vector<std::shared_ptr<Rule>> children; // Used if RuleChoice or RuleConcatenation
-		std::vector<size_t> weights; // Used if RuleChoice
-		size_t total_weights; // Used if RuleChoice
-		size_t max_occurences; // Used if RuleStar
-	};
+    struct Rule
+    {
+        enum type
+        {
+            RuleChoice,
+            RuleConcatenation,
+            RuleStar,
+            RuleString,
+            RuleSymbolName,
+        } type;
+        std::string name;
+        std::vector<std::shared_ptr<Rule>> children; // Used if RuleChoice or RuleConcatenation
+        std::vector<size_t> weights; // Used if RuleChoice
+        size_t total_weights; // Used if RuleChoice
+        size_t max_occurences; // Used if RuleStar
+    };
 
-	explicit MiniGrammarParser(std::string &path_grammar);
+    explicit MiniGrammarParser(std::string &path_grammar);
 
-	void parse();
-	std::string generate(const std::string &rulename);
+    void parse();
+    std::string generate(const std::string &rulename);
 
 private:
-	std::string MiniGrammarParser::generate_(std::shared_ptr<Rule> &rule);
-	size_t MiniGrammarParser::extract_integer(std::string &line, size_t &i);
-	bool extract_symbol_or_string(std::string &line, size_t &i, std::string &value_out);
+    std::string MiniGrammarParser::generate_(std::shared_ptr<Rule> &rule);
+    size_t MiniGrammarParser::extract_integer(std::string &line, size_t &i);
+    bool extract_symbol_or_string(std::string &line, size_t &i, std::string &value_out);
 
-	std::map<std::string, std::shared_ptr<Rule>> m_symbols;
-	std::string m_path;
+    std::map<std::string, std::shared_ptr<Rule>> m_symbols;
+    std::string m_path;
 };
