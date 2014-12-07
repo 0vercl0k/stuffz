@@ -264,6 +264,10 @@ def get_serial():
     print '> Running the code..'
     x.run()
 
+    for i in range(6):
+        with open(os.path.join('formulas', 'input_dword_%d.smt2' % i), 'w') as f_:
+            f_.write(to_SMT2(x.mem[start_addr + i*4], name = 'input_dword_%d' % i))
+
     print '> Instantiating & configuring the solver..'
     s = Solver()
     s.add(
