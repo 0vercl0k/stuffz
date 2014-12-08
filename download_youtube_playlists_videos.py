@@ -89,7 +89,8 @@ class VideoDownloader:
         fmt_stream_map = parse_qs(content_parsed['url_encoded_fmt_stream_map'][0])
 
         # Do not forget Youtube wants the signature param
-        info['video_url'] = fmt_stream_map['url'][0] + '&signature=' + fmt_stream_map['sig'][0]
+        # XXX: 08/12/2014 ; sig is not there anymore, it seems to work without it
+        info['video_url'] = fmt_stream_map['url'][0] # + '&signature=' + fmt_stream_map['sig'][0]
         info['video_title'] = self.__sanitize_title(content_parsed['title'][0])
         return info
 
