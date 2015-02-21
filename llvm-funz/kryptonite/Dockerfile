@@ -1,5 +1,6 @@
 #
-#    Dockerfile Kryptonite - Set up everything you need to play with Kryptonite in a vanilla debian jessie
+#    Dockerfile Kryptonite - Set up everything you need to play with Kryptonite in a vanilla debian jessie.
+#    Prefer an x64 based Host/Container to have both the x86/x64 versions compiled & ready to go.
 #    Copyright (C) 2015 Axel "0vercl0k" Souchet - http://www.twitter.com/0vercl0k
 #
 #    This program is free software: you can redistribute it and/or modify
@@ -22,6 +23,8 @@
 #    overclok@wildout:~/dev/kryptonite$ sudo docker images
 #    REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
 #    kryptonite          latest              b97b2d28f05e        13 seconds ago      954.6 MB
+#    overclok@wildout:~/dev/kryptonite$ sudo docker run -ti kryptonite /bin/bash
+#    [...]
 
 FROM debian:jessie
 MAINTAINER Axel "0vercl0k" Souchet <0vercl0k[at]tuxfamily[dot]org>
