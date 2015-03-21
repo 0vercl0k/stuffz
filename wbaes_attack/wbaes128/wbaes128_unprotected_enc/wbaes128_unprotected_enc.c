@@ -49,14 +49,14 @@ __forceinline void ShiftRows(unsigned char out[16])
     // +----+----+----+----+
     unsigned char tmp1, tmp2;
 
-    // 8-bits right rotation of the second line
+    // 8-bits left rotation of the second line
     tmp1 = out[1];
     out[1] = out[5];
     out[5] = out[9];
     out[9] = out[13];
     out[13] = tmp1;
 
-    // 16-bits right rotation of the third line
+    // 16-bits left rotation of the third line
     tmp1 = out[2];
     tmp2 = out[6];
     out[2] = out[10];
@@ -64,7 +64,7 @@ __forceinline void ShiftRows(unsigned char out[16])
     out[10] = tmp1;
     out[14] = tmp2;
 
-    // 24-bits right rotation of the last line
+    // 24-bits left rotation of the last line
     tmp1 = out[3];
     out[3] = out[15];
     out[15] = out[11];
