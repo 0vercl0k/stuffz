@@ -19,7 +19,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-# Show case
+'''Show case
 # Example with several constraints: "I want EAX = EBX = 0 at the end of the gadget execution":
 # xor eax, eax ; push eax ; mov ebx, eax ; ret
 # xor eax, eax ; xor ebx, ebx ; ret
@@ -42,208 +42,64 @@
 
 # Find a way to move the stack by at least 1000 bytes & set EAX to 0: "I want ((ESP >= ESP + 1000) && (ESP < ESP + 2000)) && (EAX == 0)"
 # xor eax, eax ; add esp, 0x45c ; pop ebx ; pop esi ; pop edi ; pop ebp ; ret
+'''
 
 import sys
 import operator
-from z3 import *
-
 import amoco
 import amoco.system.raw
 import amoco.system.core
+import amoco.cas.smt
 import amoco.arch.x86.cpu_x86 as cpu
+import argparse
+import multiprocessing
+import time
+import traceback
 
-def get_cpu_state_from_gadget(code, address_code = 0xdeadbeef):
+from z3 import *
+from amoco.cas.expressions import *
+
+class Constraint(object):
+    '''A constraint is basically a `src` that can be a register or a memory location,
+    an operator & an equation.
+    Note that you can also supply your own comparaison operator as soon as it takes two things in input & return a boolean.
+
+    Here is an example:
+        * src = esp, operator = '=', constraint = eax + 100
+          - It basically means that you want that ESP = EAX + 100 at the end of the execution of the gadget
+
+        * src = esp, operator = '<', constraint = esp + 100
+          - It basically means that you want that ESP < ESP + 100 at the end of the execution of the gadget
+    '''
+    def __init__(self, src, constraint, op = operator.eq):
+        self.src = src
+        self.constraint = constraint
+        self.operator = op
+
+def sym_exec_gadget_and_get_mapper(code, address_code = 0xdeadbeef):
+    '''This function gives you a ``mapper`` object from assembled `code`. `code` will basically be
+    our assembled gadgets.
+
+    Note that `call`s will be neutralized in order to not mess-up the symbolic execution (otherwise the instruction just
+    after the `call is considered as the instruction being jumped to).
+    
+    From this ``mapper`` object you can reconstruct the symbolic CPU state after the execution of your gadget.
+
+    The CPU used is x86, but that may be changed really easily, so no biggie.'''
     p = amoco.system.raw.RawExec(
-        amoco.system.core.DataIO(code)
+        amoco.system.core.DataIO(code), cpu
     )
-    p.use_x86()
     blocks = list(amoco.lsweep(p).iterblocks())
     assert(len(blocks) > 0)
     mp = amoco.cas.mapper.mapper()
     for block in blocks:
-        # If the last instruction a call, we need to "neutralize" its effect
+        # If the last instruction is a call, we need to "neutralize" its effect
         # in the final mapper, otherwise the mapper thinks the block after that one
-        # if actually the inside of the call, which is not the case in our ROP gadgets
+        # is actually 'the inside' of the call, which is not the case with ROP gadgets
         if block.instr[-1].mnemonic.lower() == 'call':
             p.cpu.i_RET(None, block.map)
         mp >>= block.map
     return mp
-
-def get_memory_expressions_from_mapper(mapper):
-    exprs = []
-    for target, expr in mapper:
-        if isinstance(target, amoco.cas.expressions.ptr):
-            exprs.append((target, expr))
-    return exprs
-
-class SymbolicCpuX86(object):
-    '''This is basically our virtual & symbolic x86 CPU.
-    You get all the register & a memory store (so yeah not really only a cpu per se)'''
-    def __init__(self):
-        self.eax, self.ebx, self.ecx, self.edx, self.esi, self.edi, self.eip, self.esp, self.ebp, self.eflags = BitVecs('eax ebx ecx edx esi edi eip esp ebp eflags', 32)
-        self.state = {
-            'eax' : self.eax,
-            'ebx' : self.ebx,
-            'ecx' : self.ecx,
-            'edx' : self.edx,
-            'esi' : self.esi,
-            'edi' : self.edi,
-            'eip' : self.eip,
-            'esp' : self.esp,
-            'ebp' : self.ebp,
-            'eflags' : self.eflags
-        }
-
-        self.mem = Array('mem', BitVecSort(32), BitVecSort(32))
-        self.vars = []
-
-        self.op =  {
-            '*' : operator.mul,
-            '+' : operator.add,
-            '-' : operator.sub,
-            '&' : operator.and_,
-            '|' : operator.or_,
-            '^' : operator.xor,
-            '~' : operator.inv,
-            '%' : operator.mod,
-            '<<' : operator.lshift,
-            '>>' : LShR,
-            '>' : operator.gt,
-            '<' : operator.lt,
-            # TODO: do that with Z3
-            '//' : operator.div, # '\xd1\xf9j\x03P\x8dF\xfa\x8d\x04HP\xff\xd7'
-            '>>>' : RotateRight,
-            '<<<' : RotateLeft
-        }
-
-    def __getitem__(self, key):
-        if key in self.state:
-            return self.state[key]
-        raise KeyError
-
-    def set_address_with_value(self, addr, value):
-        self.mem = Store(self.mem, addr, value)
-        self.vars.append(value)
-        return value
-
-    def reset_mem(self):
-        self.mem = Array('mem', BitVecSort(32), BitVecSort(32))
-        self.vars = []
-
-    def amoco_expression_to_z3(self, amoco_exp):
-        # My memory support sucks & doesn't work -- let's wait the Z3 backend in amoco
-        if isinstance(amoco_exp, amoco.cas.expressions.cst):
-            # x.base
-            return BitVecVal(amoco_exp.value, 32)
-        elif isinstance(amoco_exp, amoco.cas.expressions.reg):
-            # x.base
-            return self.state[amoco_exp.ref]
-        elif isinstance(amoco_exp, amoco.cas.expressions.ptr):
-            # x.base, x.disp
-            return self.amoco_expression_to_z3(amoco_exp.base) + BitVecVal(amoco_exp.disp, 32)
-        elif isinstance(amoco_exp, amoco.cas.expressions.mem):
-            # x.a
-            return self.set_address_with_value(
-                self.amoco_expression_to_z3(amoco_exp.a),
-                BitVec('mem_%d' % len(self.vars), 32)
-            )
-        elif isinstance(amoco_exp, amoco.cas.expressions.op):
-            return self.op[amoco_exp.op.symbol](
-                self.amoco_expression_to_z3(amoco_exp.l),
-                self.amoco_expression_to_z3(amoco_exp.r)
-            )
-        elif isinstance(amoco_exp, int):
-            return BitVecVal(amoco_exp, 32)
-        else:
-            # print type(amoco_exp)
-            raise RuntimeError
-
-symbolic_cpu = SymbolicCpuX86()
-
-class SymbolicCpuX86TargetedState(object):
-    '''This is the state you want at the end of the gadget execution.
-    Use the registers and the memory store to set your constraints.
-    Chain them, combine them to suit your needs.'''
-    def __init__(self):
-        self.state = {}
-        self.mem = {}
-        self.equiv = {
-            'eax' : cpu.eax,
-            'ebx' : cpu.ebx,
-            'ecx' : cpu.ecx,
-            'edx' : cpu.edx,
-            'esi' : cpu.esi,
-            'edi' : cpu.edi,
-            'eip' : cpu.eip,
-            'esp' : cpu.esp,
-            'ebp' : cpu.ebp,
-            'eflags' : cpu.eflags
-        }
-
-    def wants(self, register, value_op):
-        value, op = value_op
-        if isinstance(value, str):
-            value = self.equiv[value]
-
-        value = symbolic_cpu.amoco_expression_to_z3(value)
-        if register in self.state:
-            self.state[register].append((value, op))
-        else:
-            self.state[register] = [(value, op)]
-
-    def wants_register_equal(self, register, value):
-        self.wants(register, (value, operator.eq))
-
-    def wants_register_greater_or_equal(self, register, value):
-        self.wants(register, (value, operator.ge))
-
-    def wants_register_greater(self, register, value):
-        self.wants(register, (value, operator.gt))
-
-    def wants_register_lesser(self, register, value):
-        self.wants(register, (value, operator.lt))
-
-    def does_gadget_meet_constraints(self, symcpu):
-        valid = True
-        # For registers
-        for register, equation_operator in self.state.iteritems():
-            register = self.equiv[register]
-            l_equation = symbolic_cpu.amoco_expression_to_z3(symcpu[register])
-            for r_equation, op in equation_operator:
-                if op in (operator.gt, operator.ge, operator.lt, operator.le):
-                    # little trick here
-                    #   In [42]: from z3 import *
-                    #   In [43]: a, b = BitVecs('a b', 32)
-                    #   In [44]: prove(UGT((a + 10), (a+3)))
-                    #    counterexample
-                    #    [a = 4294967287] :((((
-                    #   In [65]: prove(((a+10)-(a+3)) > 0)
-                    #    proved - yay!
-
-                    if prove_(op(l_equation - r_equation, 0)) == False:
-                        valid = False
-                        break
-                else:
-                    if prove_(op(l_equation, r_equation)) == False:
-                        valid = False
-                        break
-        # For memory
-        # if valid:
-        #     # First generate the state of the memory you want
-        #     mem = Array('mem target end', BitVecSort(32), BitVecSort(32))
-        #     for mem_location, mem_content in self.mem.iteritems():
-        #         mem = Store(mem, mem_location, mem_content)
-
-        #     # Extract mem from the target mapper
-        #     mapper_mem = get_memory_expressions_from_mapper(symcpu)
-
-        #     for mem_location, l_equation in self.mem.iteritems():
-        #         r_equation = symbolic_cpu.amoco_expression_to_z3(symcpu.mem[mem_location])
-        #         if prove_(l_equation == r_equation) == False:
-        #             valid = False
-        #             break
-
-        return valid
 
 def prove_(f):
     '''Taken from http://rise4fun.com/Z3Py/tutorialcontent/guide#h26'''
@@ -253,24 +109,64 @@ def prove_(f):
         return True
     return False
 
+def get_preserved_gpr_from_mapper(mapper):
+    '''Returns a list with the preserved registers in `mapper`'''
+    # XXX: Is there a way to get that directly from `cpu` without knowing the architecture?
+    gpr = [ cpu.eax, cpu.ebx, cpu.ecx, cpu.edx, cpu.esi, cpu.edi, cpu.ebp, cpu.esp, cpu.eip ]
+    return filter(lambda reg: prove_(mapper[reg].to_smtlib() == reg.to_smtlib()), gpr)
+
+def get_preserved_gpr_from_mapper_str(mapper):
+    '''Returns a clean string instead of a list of expressions'''
+    preserved_gprs = get_preserved_gpr_from_mapper(mapper)
+    return ', '.join(str(r) for r in preserved_gprs)
+
 def are_cpu_states_equivalent(target, candidate):
+    '''This function tries to compare a set of constraints & a symbolic CPU state. The idea
+    is simple:
+        * `target` is basically a list of `constraints`
+        * `candidate` is a `mapper` instance
+
+    Every constraints inside target are going to be checked against the mapper `candidate`,
+    if they are all satisfied, it returns True, else False.'''
     valid = True
-    for reg, exp in target.iteritems():
-        if prove_(exp == symbolic_cpu.amoco_expression_to_z3(candidate[reg])) == False:
-            valid = False
+    for constraint in target:
+        reg, exp, op = constraint.src, constraint.constraint, constraint.operator
+        if op in (operator.gt, operator.ge, operator.lt, operator.le):
+            # little trick here
+            #   In [42]: from z3 import *
+            #   In [43]: a, b = BitVecs('a b', 32)
+            #   In [44]: prove(UGT((a + 10), (a+3)))
+            #    counterexample
+            #    [a = 4294967287] :((((
+            #   In [65]: prove(((a+10)-(a+3)) > 0)
+            #    proved - yay!
+            valid = prove_(op(0, exp.to_smtlib() - candidate[reg].to_smtlib()))
+        else:
+            valid = prove_(op(exp.to_smtlib(), candidate[reg].to_smtlib()))
+
+        if valid == False:
             break
 
     return valid
 
+def extract_things_from_mapper(mapper, op, *things):
+    '''Extracts whatever you want from a mapper & build a Constraint instance so that you can directly feed
+    those ones in `are_cpu_states_equivalent`.'''
+    return [ Constraint(thing, mapper[thing], op) for thing in things ]
+
+def extract_things_from_mapper_eq(mapper, *things):
+    return extract_things_from_mapper(mapper, operator.eq, *things)
+
 def test_arith_assignation():
-    print '=' * 50
-    print 'Arithmetic/Assignation tests:'
-    print '=' * 50
+    print 'Arithmetic/Assignation tests'.center(100, '=')
     disass_target, gadget_target = 'mov eax, ebx ; ret 4', '\x89\xd8\xc2\x04\x00'
-    sym_target = get_cpu_state_from_gadget(gadget_target)
-    cpu_state_end_target_eax = dict(
-        (reg, symbolic_cpu.amoco_expression_to_z3(sym_target[reg])) for reg in [cpu.eax]
-    )
+    
+    # We generate the mapper for the final state we want to reach
+    # In that state we may be interested in only one or two registers ; whatever, you extract what you want from it
+    target_mapper = sym_exec_gadget_and_get_mapper(gadget_target)
+    
+    # We pick the registers (& their amoco expressions) we are interested in inside the final ``mapper``
+    cpu_state_end_target_eax = extract_things_from_mapper_eq(target_mapper, cpu.eax)
 
     # Thanks Dad`! -- http://aurelien.wail.ly/nrop/demos/
     candidates = {
@@ -283,49 +179,42 @@ def test_arith_assignation():
     }
 
     for disass, code in candidates.iteritems():
-        cpu_state_end_candidate = get_cpu_state_from_gadget(code)
+        cpu_state_end_candidate = sym_exec_gadget_and_get_mapper(code)
         assert(are_cpu_states_equivalent(cpu_state_end_target_eax, cpu_state_end_candidate) == True)
         print ' > "%s" == "%s"' % (disass_target, disass)
 
-    cpu_state_end_target_eax_esp = dict(
-        (reg, symbolic_cpu.amoco_expression_to_z3(sym_target[reg])) for reg in [cpu.eax, cpu.esp]
-    )
-    
-    # Conservation of ESP (or not conservation in this case)
+    cpu_state_end_target_eax_esp = extract_things_from_mapper_eq(target_mapper, cpu.eax, cpu.esp)
+
+    # Conservation of ESP (or not in this case)
     gadget = 'fadd st0, st3 ; xchg ebx, eax ; pop edi ; pop edi ; ret'
     gadget_code = candidates[gadget]
     assert(
         are_cpu_states_equivalent(
             cpu_state_end_target_eax_esp,
-            get_cpu_state_from_gadget(gadget_code)
+            sym_exec_gadget_and_get_mapper(gadget_code)
         ) == False
     )
 
     print ' > "%s" != "%s"' % (disass_target, gadget)
+    csts_eax, csts_esp = cpu_state_end_target_eax_esp
     print '  > %r VS %r' % (
-        cpu_state_end_target_eax_esp[cpu.esp],
-        symbolic_cpu.amoco_expression_to_z3(get_cpu_state_from_gadget(gadget_code)[cpu.esp])
+        csts_esp.constraint.to_smtlib(),
+        sym_exec_gadget_and_get_mapper(gadget_code)[cpu.esp].to_smtlib()
     )
 
     disass_target, gadget_target = 'mov eax, 0x1234 ; ret', '\xb8\x34\x12\x00\x00\xc3'
     disass, gadget = 'mov edx, 0xffffedcc ; xor eax, eax ; sub eax, edx ; ret', '\xba\xcc\xed\xff\xff\x31\xc0\x29\xd0\xc3'
-    sym_target = get_cpu_state_from_gadget(gadget_target)
-    cpu_state_end_target_eax = dict(
-        (reg, symbolic_cpu.amoco_expression_to_z3(sym_target[reg])) for reg in [cpu.eax]
-    )
+    target_mapper = sym_exec_gadget_and_get_mapper(gadget_target)
 
-    assert(are_cpu_states_equivalent(cpu_state_end_target_eax, get_cpu_state_from_gadget(gadget)) == True)
+    cpu_state_end_target_eax = extract_things_from_mapper_eq(target_mapper, mem(cpu.eax))
+    assert(are_cpu_states_equivalent(cpu_state_end_target_eax, sym_exec_gadget_and_get_mapper(gadget)) == True)
     print ' > "%s" == "%s"' % (disass_target, disass)
 
-def testing_memory_stuff():
-    print '=' * 50
-    print 'Memory store / read tests:'
-    print '=' * 50
+def test_memory_stuff():
+    print 'Memory store / read tests:'.center(100, '=')
     disass_target, gadget_target = 'mov eax, 0x1234 ; ret', '\xb8\x34\x12\x00\x00\xc3'
-    sym_target = get_cpu_state_from_gadget(gadget_target)
-    cpu_state_end_target_eax = dict(
-        (reg, symbolic_cpu.amoco_expression_to_z3(sym_target[reg])) for reg in [cpu.eax]
-    )
+    target_mapper = sym_exec_gadget_and_get_mapper(gadget_target)
+    cpu_state_end_target_eax = extract_things_from_mapper_eq(target_mapper, cpu.eax)
 
     candidates = {
         'push 0xffffedcc ; pop edx ; xor eax, eax ; sub eax, edx ; ret' : '\x68\xcc\xed\xff\xff\x5a\x31\xc0\x29\xd0\xc3',
@@ -333,89 +222,99 @@ def testing_memory_stuff():
     }
 
     for disass, code in candidates.iteritems():
-        cpu_state_end_candidate = get_cpu_state_from_gadget(code)
-        # print cpu_state_end_candidate
-        # print get_z3_expr(cpu_state_end_candidate[cpu.eax])
+        cpu_state_end_candidate = sym_exec_gadget_and_get_mapper(code)
         assert(are_cpu_states_equivalent(cpu_state_end_target_eax, cpu_state_end_candidate) == True)
         print ' > "%s" == "%s"' % (disass_target, disass)
 
+    cpu_state_end_target_esp = [ Constraint(cpu.esp, mem(cpu.ebp, 32) + 8) ]
+    candidates = {
+        # https://twitter.com/NicoEconomou/status/527555631017107456 -- thanks @NicoEconomou! 
+        'leave ; setl cl ; mov eax, ecx ; pop edi ; pop ebx ; pop esi ; leave ; ret' : '\xc9\x0f\x9c\xc1\x89\xc8\x5f\x5b\x5e\xc9\xc3',
+    }
+    for disass, code in candidates.iteritems():
+        cpu_state_end_candidate = sym_exec_gadget_and_get_mapper(code)
+        assert(are_cpu_states_equivalent(cpu_state_end_target_esp, cpu_state_end_candidate) == True)
+        print ' > "%s" == "%s"' % (disass_target, disass)
+
+    disass_target, gadget_target = 'add [eax], 4 ; ret', '\x83\x00\x04\xc3'
+    target_mapper = sym_exec_gadget_and_get_mapper(gadget_target)
+    cpu_state_end_target_mem_eax = extract_things_from_mapper_eq(target_mapper, mem(cpu.eax, 32))
+    candidates = {
+        'inc [eax] ; mov ebx, eax ; push ebx ; mov esi, [esp] ; add [esi], 3 ; mov ebx, [esi] ; mov [eax], ebx ; ret' : '\xff\x00\x89\xc3\x53\x8b\x34\x24\x83\x06\x03\x8b\x1e\x89\x18\xc3',
+        'inc [eax] ; push eax ; mov esi, [esp] ; add [esi], 3 ; mov ebx, [esi] ; mov [eax], ebx ; ret' : '\xff\x00\x50\x8b\x34\x24\x83\x06\x03\x8b\x1e\x89\x18\xc3',
+    }
+
+    for disass, code in candidates.iteritems():
+        cpu_state_end_candidate = sym_exec_gadget_and_get_mapper(code)
+        assert(are_cpu_states_equivalent(cpu_state_end_target_mem_eax, cpu_state_end_candidate) == True)
+        print ' > "%s" == "%s"' % (disass_target, disass)
+
+    disass_target = 'EIP = [ESP + 0x24]'
+    cpu_state_end_target_eip = [ Constraint(cpu.eip, mem(cpu.esp + 0x24, 32)) ]
+    candidates = {
+        'add esp, 0x24 ; ret' : '\x83\xc4\x24\xc3'
+    }
+
+    for disass, code in candidates.iteritems():
+        cpu_state_end_candidate = sym_exec_gadget_and_get_mapper(code)
+        assert(are_cpu_states_equivalent(cpu_state_end_target_eip, cpu_state_end_candidate) == True)
+        print ' > "%s" == "%s"' % (disass_target, disass)
+
+    disass_target = 'ESP = [ESP + 0x24]'
+    cpu_state_end_target_esp = [ Constraint(cpu.esp, mem(cpu.esp + 0x24, 32)) ]
+    candidates = {
+        'add esp, 0x24 ; mov esp, [esp]' : '\x83\xc4\x24\x8b\x24\x24'
+    }
+
+    for disass, code in candidates.iteritems():
+        cpu_state_end_candidate = sym_exec_gadget_and_get_mapper(code)
+        print '  >', cpu_state_end_candidate[cpu.esp], 'VS', cpu_state_end_target_esp[0].constraint
+        assert(are_cpu_states_equivalent(cpu_state_end_target_esp, cpu_state_end_candidate) == True)
+        print ' > "%s" == "%s"' % (disass_target, disass)
+
+def test_inequation():
+    pass
+
+def test_preserved_registers():
+    pass
+
 def testing():
     test_arith_assignation()
-    testing_memory_stuff()
+    test_memory_stuff()
+    test_inequation()
+    test_preserved_registers()
 
-def build_candidates(maxtuple = None):
+def build_candidates(f, maxtuple = None):
+    '''Gets all the gadgets (both assembly & disassembly) from `f` & return them'''
     candidates = []
-    with open(r'D:\Codes\gadgets.txt', 'r') as f:
-        i = 0
-        for line in f.readlines():
-            first_part, second_part = line.split(' ;  ')
-            _, disass = first_part.split(':', 1)
-            bytes, _ = second_part.split(' (')
-            candidates.append([disass, bytes.decode('string_escape')])
-            i += 1
-            if max(maxtuple, i) != i:
-                break
+    for line in f.readlines():
+        if ' ;  ' not in line:
+            continue
+
+        first_part, second_part = line.split(' ;  ')
+        _, disass = first_part.split(':', 1)
+        bytes, _ = second_part.split(' (')
+
+        candidates.append([disass, bytes.decode('string_escape')])
+        if maxtuple != None and len(candidates) == maxtuple:
+            break
+
     return candidates
 
-def main(argc, argv):
-    amoco.set_quiet()
+class HandleCandidate(object):
+    '''This class is here because partial functions are not pickable ;
+    so you can't use them with multiprocessing.Pool in Py27.
+    This functor kind of workaround that nicely!'''
+    def __init__(self, targeted_state, g_list):
+        self.targeted_state = targeted_state
+        self.g_list = g_list
 
-    testing()
-    # return 0
-    # candidates = build_candidates(maxtuple = None)
-    # print len(candidates)
-    candidates = []
-
-    # candidates['add eax, 0xc3d88948 ; xchg rbx, rax ; ret'] = '\x05\x48\x89\xd8\xc3\x87\xd8\xc3'
-    # candidates['xor eax, eax ; not eax ; and eax, ebx ; ret'] = '\x31\xc0\xf7\xd0\x21\xd8\xc3'
-    # candidates.append(('add esp, 0x3ff ; xor eax, eax', '\x81\xc4\xff\x03\x00\x00\x31\xc0'))
-    # candidates['add ebx, dword ptr [edx + eax + 0x43140e0a] ; ret'] = '\x03\x9c\x02\x0a\x0e\x14\x43\xc3'
-    # candidates['push ecx ; popad ; pop esp ; ret'] = '\x51\x61\x5c\xc3'
-
-    # candidates.append(('xor eax, eax ; xor ebx, ebx ; xor ecx, ecx', '\x31\xc0\x31\xdb\x31\xc9'))
-    # candidates['xor eax, eax ; push eax ; mov ebx, eax ; ret'] = '\x31\xc0\x50\x89\xc3\xc3'
-    # candidates['rcr byte ptr [esi+0x48], 0x1 ; xor eax, eax ; not eax ; and eax, ebx ; ret'] = '\xd0\x5e\x48\x31\xc0\xf7\xd0\x21\xd8\xc3'
-    # <over> !a32 mov eax, ebx ; ret
-    # \x89\xd8\xc3
-    
-    candidates.append(('inc [eax]', '\xff\x00'))
-
-    # TODO:
-    #  Inequations: why do they actually work?:D
-    #  Memory
-
-    # Show case: [EAX] = EAX+1
-    # cpu_state_end_target = SymbolicCpuX86TargetedState()
-    # cpu_state_end_target.mem[amoco.cas.expressions.ptr(cpu.eax)] = amoco.cas.expressions.mem(cpu.eax) + 1
-
-    # Show case: EAX = EBX = 0
-    # cpu_state_end_target = SymbolicCpuX86TargetedState()
-    # cpu_state_end_target.wants_register_equal('eax', 0)
-    # cpu_state_end_target.wants_register_equal('ebx', 0)
-
-    # Show case: EDI = ESI
-    # cpu_state_end_target = SymbolicCpuX86TargetedState()
-    # cpu_state_end_target.wants_register_equal('edi', 'esi')
-
-    # Show case: ((ESP >= ESP + 1000) && (ESP < ESP + 2000)) && (EAX == 0)
-    cpu_state_end_target = SymbolicCpuX86TargetedState()
-    cpu_state_end_target.wants_register_greater_or_equal('esp', cpu.esp + 1000)
-    cpu_state_end_target.wants_register_lesser('esp', cpu.esp + 2000)
-    cpu_state_end_target.wants_register_equal('eax', 0)
-
-    # Show case: Pivot ; EIP = ESP
-    # cpu_state_end_target = SymbolicCpuX86TargetedState()
-    # cpu_state_end_target.wants_register_equal('eip', 'esp')
-
-    matches = []
-    print 'Trying to find equivalents..'
-    for disass, bytes in candidates:
+    def __call__(self, candidate):
+        disass, bytes = candidate
         try:
-            sym = get_cpu_state_from_gadget(bytes)
-            symbolic_cpu.mem = {}
-            if cpu_state_end_target.does_gadget_meet_constraints(sym):
-                print '  GOT A MATCH with %r' % disass
-                matches.append(disass)
+            candidate_mapper = sym_exec_gadget_and_get_mapper(bytes)
+            if are_cpu_states_equivalent(self.targeted_state, candidate_mapper) == True:
+                self.g_list.append((disass, get_preserved_gpr_from_mapper_str(candidate_mapper)))
         except AssertionError, e:
             pass
         except RuntimeError, e:
@@ -423,15 +322,97 @@ def main(argc, argv):
         except Exception, e:
             if str(e) != 'size mismatch':
                 print '?? %s with %s:%r' % (str(e), disass, bytes)
+                traceback.print_exc()
             # pass
 
-    print '='*20
-    print 'Gadgets equivalent to'
-    print cpu_state_end_target
-    print '='*20
-    print '\n'.join(matches)
-    print '='*20
+def main():
+    parser = argparse.ArgumentParser(description = 'Find a suitable ROP gadget via custom constraints.')
+    parser.add_argument('--run-tests', action = 'store_true', help = 'Run the unit tests')
+    parser.add_argument('--file', type = argparse.FileType('r'), help = 'The files with every available gadgets you have')
+    parser.add_argument('--nprocesses', type = int, default = 2)
+    
+    amoco.set_quiet()
+    # Disable aliasing -- mov [eax], ebx ; mov [ebx], 10; jmp [eax]
+    # Here we assume that eax & ebx are different. Without assume_no_aliasing, we would have eip <- M32$2(eax)
+    amoco.cas.mapper.mapper.assume_no_aliasing = True
+
+    args = parser.parse_args()
+    if args.run_tests:
+        testing()
+
+    if args.file is None:
+        if args.run_tests is None:
+            parser.print_help()
+        return 0
+
+    candidates = build_candidates(args.file, maxtuple = None)
+    print '> Found %d candidates' % len(candidates)
+    # TODO:
+    #  Inequations: why do they actually work?:D
+    # Add preserved registers
+
+    # Show case: Pivot ; EIP = ESP
+    # cpu_state_end_target = SymbolicCpuX86TargetedState()
+    # cpu_state_end_target.wants_register_equal('eip', 'esp')
+
+    # cpu_state_end_target = { cpu.esp : mem(cpu.esp + 0x24, 32) }
+    
+    # Show case: [EAX] = EAX+1
+    # targeted_state = [
+    #     Constraint(mem(cpu.eax, 32), cpu.eax + 1)
+    # ]
+
+    # Show case: EAX = EBX = 0
+    # XXX: Try if (EAX = 0, EBX = 0) == (EAX = EBX, EBX = 0)
+    # targeted_state = [
+    #     Constraint(cpu.eax, cst(0, 32)),
+    #     Constraint(cpu.ebx, cst(0, 32))
+    # ]
+
+    # Show case: EDI = ESI
+    # targeted_state = [
+    #     Constraint(cpu.edi, cpu.esi),
+    # ]
+
+    # Show case: ((ESP >= ESP + 1000) && (ESP < ESP + 2000)) && (EAX == 0)
+    targeted_state = [
+        Constraint(cpu.esp, cpu.esp + cst(1000, 32), operator.ge),
+        Constraint(cpu.esp, cpu.esp + cst(2000, 32), operator.lt),
+        # Constraint(cpu.eax, cst(0, 32))
+    ]
+
+    manager = multiprocessing.Manager()
+    matches = manager.list()
+
+    print '> Trying to find what you want..'
+    t1 = time.time()
+    p = multiprocessing.Pool(processes = args.nprocesses)
+    job = p.map_async(
+        HandleCandidate(targeted_state, matches),
+        candidates
+    )
+
+    last_idx = 0
+    while job.ready() == False:
+        job.wait(20)
+        len_matches = len(matches)
+        print '>> Found %d gadgets so far...' % len_matches
+        if last_idx < len_matches:
+            for i in range(last_idx, len_matches):
+                disass, preserved_gprs = matches[i]
+                print '>>>', matches[i], '; Preserved GPRs:', preserved_gprs
+                last_idx = len_matches
+
+    print '> Done, found %d matches in %ds!' % (len(matches), time.time() - t1)
+    print 'Your constraints'.center(50, '=')
+    for constraint in targeted_state:
+        print ' >', constraint.src, '->', constraint.constraint
+
+    print 'Successful matches'.center(50, '=')
+    for disass, preserved_gprs in matches:
+        print ' >', disass, '; Preserved GPRs:', preserved_gprs
+
     return 1
 
 if __name__ == '__main__':
-    sys.exit(main(len(sys.argv), sys.argv))
+    sys.exit(main())
