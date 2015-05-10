@@ -25,7 +25,6 @@ import ctypes
 import getpass
 import subtitle
 import requests
-# https://bitbucket.org/blueluna/transmissionrpc
 import transmissionrpc
 from torrent_config import *
 from bs4 import BeautifulSoup
@@ -46,26 +45,6 @@ def look_for_magnet_in_eztv(full_title):
     assert(link_title_release.get('class') == ['epinfo'] and link_magnet.get('class') == ['magnet'])
     return link_title_release.get_text().replace(' ', '.'), link_magnet.get('href')
 
-def copy_into_clipboard(data):
-    strcpy = ctypes.cdll.msvcrt.strcpy
-    OpenClipboard = ctypes.windll.user32.OpenClipboard
-    SetClipboardData = ctypes.windll.user32.SetClipboardData
-    EmptyClipboard = ctypes.windll.user32.EmptyClipboard
-    CloseClipboard = ctypes.windll.user32.CloseClipboard
-    GlobalAlloc = ctypes.windll.kernel32.GlobalAlloc
-    GlobalLock = ctypes.windll.kernel32.GlobalLock
-    GlobalUnlock = ctypes.windll.kernel32.GlobalUnlock
-    GMEM_DDESHARE = 0x2000 
-
-    OpenClipboard(None)
-    EmptyClipboard()
-    hMem = GlobalAlloc(GMEM_DDESHARE, len(data) + 1)
-    hData = GlobalLock(hMem)
-    strcpy(ctypes.c_char_p(hData), data)
-    GlobalUnlock(hMem)
-    SetClipboardData(1, hMem)
-    CloseClipboard()
-
 def main(argc, argv):
     if argc != 2:
         print './get_magnet_link My.Serie.S01E02'
@@ -74,7 +53,6 @@ def main(argc, argv):
     full_title = argv[1]
     release_name, magnet_link = look_for_magnet_in_eztv(full_title)
     print release_name
-    copy_into_clipboard(magnet_link)
     if raw_input('>> Do you want to transmission-remote the link to your server? [y/n]\n').lower() == 'y':
         server = raw_input('>>> Server?\n') if PREFERED_SERVER == '' else PREFERED_SERVER
         user = raw_input('>>> Username?\n') if PREFERED_USER == '' else PREFERED_USER
