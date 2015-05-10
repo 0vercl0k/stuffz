@@ -23,11 +23,9 @@ import sys
 import xmlrpclib
 import os
 import zipfile
-
-__AUTHOR__ = '0vercl0k'
+from torrent_config import *
 
 SERVER_API_URL = 'http://api.opensubtitles.org/xml-rpc'
-TMP_DIR = r'D:\\'
 
 def get_subtitle(full_title, out_dir_base):
     # Login
@@ -52,8 +50,8 @@ def get_subtitle(full_title, out_dir_base):
         return
     
     for entry in r['data']:
-        print '[%s downloads - %s] %s -\n %s' % (entry['SubDownloadsCnt'], entry['SubLanguageID'], entry['MovieReleaseName'], entry['ZipDownloadLink'])
-        if raw_input('>> y/n? ').lower() == 'y':
+        print '[%s downloads - %s] %s -\n %s? [y/n]' % (entry['SubDownloadsCnt'], entry['SubLanguageID'], entry['MovieReleaseName'], entry['ZipDownloadLink'])
+        if raw_input('').lower() == 'y':
             out_path = os.path.join(out_dir_base, 'tmp_subtitle.zip')
             os.system('wget "%s" --no-check-certificate -O "%s"' % (entry['ZipDownloadLink'], out_path))
             z = zipfile.ZipFile(out_path)

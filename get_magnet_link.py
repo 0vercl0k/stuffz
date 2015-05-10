@@ -27,7 +27,7 @@ import subtitle
 import requests
 # https://bitbucket.org/blueluna/transmissionrpc
 import transmissionrpc
-from get_magnet_link_config import *
+from torrent_config import *
 from bs4 import BeautifulSoup
 
 def look_for_magnet_in_eztv(full_title):
@@ -73,7 +73,7 @@ def main(argc, argv):
 
     full_title = argv[1]
     release_name, magnet_link = look_for_magnet_in_eztv(full_title)
-    print release_name, magnet_link
+    print release_name
     copy_into_clipboard(magnet_link)
     if raw_input('>> Do you want to transmission-remote the link to your server? [y/n]\n').lower() == 'y':
         server = raw_input('>>> Server?\n') if PREFERED_SERVER == '' else PREFERED_SERVER
