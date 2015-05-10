@@ -20,10 +20,31 @@
 #
 
 import sys
-import eztv
 import re
 import ctypes
+import getpass
 import subtitle
+import requests
+# https://bitbucket.org/blueluna/transmissionrpc
+import transmissionrpc
+from get_magnet_link_config import *
+from bs4 import BeautifulSoup
+
+def look_for_magnet_in_eztv(full_title):
+    '''Look for a magnet link @ EZTV for the episode you are looking for'''
+    url = "https://eztv.ch/search/"
+    # Normalize the full_title, EZTV doesn't use '.' as a separator, but I do
+    # Let's just replace them
+    payload = {
+        'SearchString1': full_title.replace('.', ' '),
+        'SearchString': '',
+        'search': 'Search'
+    }
+
+    req = requests.post(url, data = payload, timeout = 5, verify = False)
+    link_title_release, link_magnet = BeautifulSoup(req.content).find_all('a', class_ = lambda x: x in ['epinfo', 'magnet'])[:2]
+    assert(link_title_release.get('class') == ['epinfo'] and link_magnet.get('class') == ['magnet'])
+    return link_title_release.get_text().replace(' ', '.'), link_magnet.get('href')
 
 def copy_into_clipboard(data):
     strcpy = ctypes.cdll.msvcrt.strcpy
@@ -50,13 +71,20 @@ def main(argc, argv):
         print './get_magnet_link My.Serie.S01E02'
         return 0
 
-    show_title, _, episode_info = map(lambda x: x.replace('.', ' '), argv[1].rpartition('.'))
-    season, episode = map(lambda x: int(x, 10), re.match(r'S(\d+)E(\d+)', episode_info).groups()) 
-    e = eztv.EztvAPI().tv_show(show_title).episode(season, episode)
-    print e
-    copy_into_clipboard(e)
-    raw_input('>> Ready to fetch the subs?')
-    subtitle.get_subtitle(argv[1], 'D:\\')
+    full_title = argv[1]
+    release_name, magnet_link = look_for_magnet_in_eztv(full_title)
+    print release_name, magnet_link
+    copy_into_clipboard(magnet_link)
+    if raw_input('>> Do you want to transmission-remote the link to your server? [y/n]\n').lower() == 'y':
+        server = raw_input('>>> Server?\n') if PREFERED_SERVER == '' else PREFERED_SERVER
+        user = raw_input('>>> Username?\n') if PREFERED_USER == '' else PREFERED_USER
+        pwd = getpass.getpass()
+        tc = transmissionrpc.Client(address = server, user = user, password = pwd)
+        print tc.add_torrent(magnet_link)
+
+    if raw_input('>> Do you want to fetch the subs? [y/n]\n').lower() == 'y':
+        subtitle.get_subtitle(release_name, 'D:\\')
+    
     return 1
 
 if __name__ == '__main__':

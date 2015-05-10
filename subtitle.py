@@ -51,7 +51,7 @@ def get_subtitle(full_title, out_dir_base):
         print 'No result.'
         return
     
-    for entry in r['data'][:3]:
+    for entry in r['data']:
         print '[%s downloads - %s] %s -\n %s' % (entry['SubDownloadsCnt'], entry['SubLanguageID'], entry['MovieReleaseName'], entry['ZipDownloadLink'])
         if raw_input('>> y/n? ').lower() == 'y':
             out_path = os.path.join(out_dir_base, 'tmp_subtitle.zip')
