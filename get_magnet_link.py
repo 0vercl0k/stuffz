@@ -29,9 +29,14 @@ import transmissionrpc
 from torrent_config import *
 from bs4 import BeautifulSoup
 
+class Episode(object):
+    def __init__(self, release_name, magnet_link):
+        self.release_name = release_name.get_text().replace(' ', '.')
+        self.magnet_link = magnet_link.get('href')
+
 def look_for_magnet_in_eztv(full_title):
     '''Look for a magnet link @ EZTV for the episode you are looking for'''
-    url = "https://eztv.ch/search/"
+    url = 'https://eztv.ch/search/'
     # Normalize the full_title, EZTV doesn't use '.' as a separator, but I do
     # Let's just replace them
     payload = {
@@ -41,9 +46,15 @@ def look_for_magnet_in_eztv(full_title):
     }
 
     req = requests.post(url, data = payload, timeout = 5, verify = False)
-    link_title_release, link_magnet = BeautifulSoup(req.content).find_all('a', class_ = lambda x: x in ['epinfo', 'magnet'])[:2]
-    assert(link_title_release.get('class') == ['epinfo'] and link_magnet.get('class') == ['magnet'])
-    return link_title_release.get_text().replace(' ', '.'), link_magnet.get('href')
+    for tr in BeautifulSoup(req.content).find_all('tr', class_ = 'forum_header_border'):
+        links = tr.find_all('a', class_ = lambda x: x in ['epinfo', 'magnet'])
+        if len(links) != 2:
+            continue
+        title_release, magnet = links
+        assert(title_release.get('class') == ['epinfo'] and magnet.get('class') == ['magnet'])
+        yield Episode(title_release, magnet)     
+        
+    raise StopIteration
 
 def main(argc, argv):
     if argc != 2:
@@ -51,17 +62,19 @@ def main(argc, argv):
         return 0
 
     full_title = argv[1]
-    release_name, magnet_link = look_for_magnet_in_eztv(full_title)
-    print release_name
-    if raw_input('>> Do you want to transmission-remote the link to your server? [y/n]\n').lower() == 'y':
-        server = raw_input('>>> Server?\n') if PREFERED_SERVER == '' else PREFERED_SERVER
-        user = raw_input('>>> Username?\n') if PREFERED_USER == '' else PREFERED_USER
-        pwd = getpass.getpass()
-        tc = transmissionrpc.Client(address = server, user = user, password = pwd)
-        print tc.add_torrent(magnet_link)
+    for episode in look_for_magnet_in_eztv(full_title):
+        print episode.release_name
+        if raw_input('>> Do you want to transmission-remote the link to your server? [y/n]\n').lower() == 'y':
+            server = raw_input('>>> Server?\n') if PREFERED_SERVER == '' else PREFERED_SERVER
+            user = raw_input('>>> Username?\n') if PREFERED_USER == '' else PREFERED_USER
+            pwd = getpass.getpass()
+            tc = transmissionrpc.Client(address = server, user = user, password = pwd)
+            print tc.add_torrent(episode.magnet_link)
 
-    if raw_input('>> Do you want to fetch the subs? [y/n]\n').lower() == 'y':
-        subtitle.get_subtitle(release_name, 'D:\\')
+            if raw_input('>> Do you want to fetch the subs? [y/n]\n').lower() == 'y':
+                subtitle.get_subtitle(episode.release_name, 'D:\\')
+
+            break
     
     return 1
 
