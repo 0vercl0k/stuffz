@@ -20,6 +20,7 @@
 #
 
 import sys
+import subprocess
 import xmlrpclib
 import os
 import zipfile
@@ -53,7 +54,12 @@ def get_subtitle(full_title, out_dir_base):
         print '[%s downloads - %s] %s -\n %s? [y/n]' % (entry['SubDownloadsCnt'], entry['SubLanguageID'], entry['MovieReleaseName'], entry['ZipDownloadLink'])
         if raw_input('').lower() == 'y':
             out_path = os.path.join(out_dir_base, 'tmp_subtitle.zip')
-            os.system('wget "%s" --no-check-certificate -O "%s"' % (entry['ZipDownloadLink'], out_path))
+            devnull = open(os.devnull)
+            subprocess.call(
+                ['wget',  entry['ZipDownloadLink'], '--no-check-certificate', '-O', out_path],
+                stdout = devnull,
+                stderr = devnull
+            )
             z = zipfile.ZipFile(out_path)
             srt_name = filter(lambda x: x.endswith('.srt'), z.namelist())[0]
             z.extract(srt_name, out_dir_base)
