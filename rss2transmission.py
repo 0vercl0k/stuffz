@@ -33,27 +33,22 @@ from torrent_config import *
 
 class Episode(object):
     def __init__(self, name):
+        showrss_regex = '([0-9]{1,2})x([0-9]{1,2})'
         self.name = name
-
-        regexes = [
-            '([0-9]{1,2})x([0-9]{1,2})',
-            'S([0-9]{1,2})E([0-9]{1,2})'
-        ]
-
-        match_found = False
-        for regex in regexes:
-            r = re.search(regex, name)
-
-            # we found a perfect match
-            if r != None and len(r.groups()) == 2:
-                match_found = True
+        s = self.name.split()
+        tmp = []
+        for x in s:
+            if re.search(showrss_regex, x) is None:
+                tmp.append(x.lower())
+            else:
                 break
-
-        if match_found == False:
+        self.name = ' '.join(tmp)
+        r = re.search(showrss_regex, name)
+        if r != None and len(r.groups()) == 2:
+            self.season = int(r.group(1), 10)
+            self.episode = int(r.group(2), 10)
+        else:
             raise RuntimeError('Cannot extract the episode & season id from %s' % name)
-
-        self.season = int(r.group(1), 10)
-        self.episode = int(r.group(2), 10)
 
 class DatabaseManager(object):
     def __init__(self, databasepath):
@@ -87,7 +82,7 @@ class DatabaseManager(object):
     def exists(self, s):
         e = Episode(s)
         c = self.co.cursor()
-        c.execute('SELECT count(*) FROM "ShowRSS" WHERE season = ? AND episode = ?', (e.season, e.episode))
+        c.execute('SELECT count(*) FROM "ShowRSS" WHERE name = ?, season = ? AND episode = ?', (e.name, e.season, e.episode))
         row = c.fetchone()
         if row[0] == 0:
             return False
