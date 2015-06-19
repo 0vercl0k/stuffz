@@ -124,7 +124,7 @@ def main(argc, argv):
     )
     server, user, pwd, tc = None, None, None, None
     for item in dom.findall('channel/item'):
-        name = item.find('title').text.encode('ascii')
+        name = item.find('title').text.encode('ascii', errors = 'ignore')
         if not dbmgr.exists(name):
             print '> Adding %s..' % name
             if server is None:
