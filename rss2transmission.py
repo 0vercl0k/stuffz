@@ -82,7 +82,7 @@ class DatabaseManager(object):
     def exists(self, s):
         e = Episode(s)
         c = self.co.cursor()
-        c.execute('SELECT count(*) FROM "ShowRSS" WHERE name = ?, season = ? AND episode = ?', (e.name, e.season, e.episode))
+        c.execute('SELECT count(*) FROM "ShowRSS" WHERE name = ? AND season = ? AND episode = ?', (e.name, e.season, e.episode))
         row = c.fetchone()
         if row[0] == 0:
             return False
