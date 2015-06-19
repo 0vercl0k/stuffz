@@ -136,7 +136,7 @@ def main(argc, argv):
             if tc is None:
                 tc = transmissionrpc.Client(address = server, user = user, password = pwd)
 
-            print tc.add_torrent(episode.magnet_link)
+            print tc.add_torrent(item.find('link').text)
             dbmgr.add(name)
             downhist.add(name)
     return 1
