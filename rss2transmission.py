@@ -131,7 +131,7 @@ def main(argc, argv):
             if user is None:
                 user = raw_input('>> Username?\n') if PREFERED_USER == '' else PREFERED_USER
             if pwd is None:
-                pwd = getpass.getpass()
+                pwd = getpass.getpass() if PREFERED_PWD == '' else PREFERED_PWD
 
             if tc is None:
                 tc = transmissionrpc.Client(address = server, user = user, password = pwd)
