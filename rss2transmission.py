@@ -124,7 +124,7 @@ def main(argc, argv):
     )
     server, user, pwd, tc = None, None, None, None
     for item in dom.findall('channel/item'):
-        name = item.find('title').text
+        name = item.find('title').text.encode('ascii')
         if not dbmgr.exists(name):
             print '> Adding %s..' % name
             if server is None:
@@ -137,7 +137,12 @@ def main(argc, argv):
             if tc is None:
                 tc = transmissionrpc.Client(address = server, user = user, password = pwd)
 
-            print tc.add_torrent(item.find('link').text)
+            try:
+                print tc.add_torrent(item.find('link').text)
+            except transmissionrpc.TransmissionError, e:
+                print str(e)
+                continue
+
             dbmgr.add(name)
             downhist.add(name)
     return 1
