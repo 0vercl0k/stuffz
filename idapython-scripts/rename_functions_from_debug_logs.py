@@ -46,7 +46,6 @@ Examples of output:
 '''
 
 import sys
-import itertools
 from idaapi import *
 from idc import *
 
