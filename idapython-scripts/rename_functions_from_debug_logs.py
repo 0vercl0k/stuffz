@@ -50,31 +50,33 @@ from idaapi import *
 from idc import *
 
 def main(argc, argv):
-    for xref in CodeRefsTo(0x1400024B8, 0):
-        instr_addr = xref
-        for _ in range(10):
-            print '  -> Scanning back', hex(instr_addr)
-            # Oboi, `yrp` you rock man.
-            instr_addr = DecodePreviousInstruction(instr_addr).ea
-            if GetMnem(instr_addr) == 'lea' and GetOpnd(instr_addr, 0) == 'r9' and GetOpType(instr_addr, 1) == o_mem:
-                s = GetString(
-                    GetOperandValue(instr_addr, 1),
-                    -1,
-                    ASCSTR_C
-                )
+    debug_log_routines = (0x1400026E4, 0x1400024B8, 0x14001417C)
+    for debug_routine_addr in debug_log_routines:
+        for xref in CodeRefsTo(debug_routine_addr, 0):
+            instr_addr = xref
+            for _ in range(10):
+                print '  -> Scanning back', hex(instr_addr)
+                # Oboi, `yrp` you rock man.
+                instr_addr = DecodePreviousInstruction(instr_addr).ea
+                if GetMnem(instr_addr) == 'lea' and GetOpnd(instr_addr, 0) == 'r9' and GetOpType(instr_addr, 1) == o_mem:
+                    s = GetString(
+                        GetOperandValue(instr_addr, 1),
+                        -1,
+                        ASCSTR_C
+                    )
 
-                try:
-                    function_addr = idaapi.get_func(instr_addr).startEA
-                except:
-                    print '  /!\\ There is no function defined, create one:', hex(instr_addr)
+                    try:
+                        function_addr = idaapi.get_func(instr_addr).startEA
+                    except:
+                        print '  /!\\ There is no function defined, create one:', hex(instr_addr)
+                        break
+
+                    # XXX: we assume the lea instruction will be something like `lea r9, address`
+                    # But in fact, if we have a register instead of the absolute address, we need to trace it back where it comes from
+                    # It does sound annoying to do in IDAPython though :'
+                    print '   -> Found:', hex(function_addr), s
+                    MakeName(function_addr, s.replace('~', 'dtor_'))
                     break
-
-                # XXX: we assume the lea instruction will be something like `lea r9, address`
-                # But in fact, if we have a register instead of the absolute address, we need to trace it back where it comes from
-                # It does sound annoying to do in IDAPython though :'
-                print '   -> Found:', hex(function_addr), s
-                MakeName(function_addr, s.replace('~', 'dtor_'))
-                break
     return 1
 
 if __name__ == '__main__':

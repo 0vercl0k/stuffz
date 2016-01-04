@@ -36,7 +36,7 @@ class Episode(object):
 
 def look_for_magnet_in_eztv(full_title):
     '''Look for a magnet link @ EZTV for the episode you are looking for'''
-    url = 'https://eztv.ch/search/'
+    url = 'https://eztv.ag/search/'
     # Normalize the full_title, EZTV doesn't use '.' as a separator, but I do
     # Let's just replace them
     payload = {
