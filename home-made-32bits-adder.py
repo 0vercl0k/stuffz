@@ -22,7 +22,7 @@
 
 import sys
 
-def adder32(A, B):
+def full_adder32(A, B):
     """
     ALU 1bit:
     A B Cin | Cout S
