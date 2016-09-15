@@ -1,0 +1,24 @@
+--- afl-2.31b/llvm_mode/Makefile	2016-06-24 03:38:49.000000000 +0100
++++ /home/overclok/workz/afl-2.31b/llvm_mode/Makefile	2016-09-15 05:46:06.445643946 +0100
+@@ -55,9 +55,9 @@
+ endif
+ 
+ ifndef AFL_TRACE_PC
+-  PROGS      = ../afl-clang-fast ../afl-llvm-pass.so ../afl-llvm-rt.o ../afl-llvm-rt-32.o ../afl-llvm-rt-64.o
++  PROGS      = ../afl-clang-fast ../afl-llvm-tokencap-pass.so ../afl-llvm-pass.so ../afl-llvm-rt.o ../afl-llvm-rt-32.o ../afl-llvm-rt-64.o
+ else
+-  PROGS      = ../afl-clang-fast ../afl-llvm-rt.o ../afl-llvm-rt-32.o ../afl-llvm-rt-64.o
++  PROGS      = ../afl-clang-fast ../afl-llvm-tokencap-pass.so ../afl-llvm-rt.o ../afl-llvm-rt-32.o ../afl-llvm-rt-64.o
+ endif
+ 
+ all: test_deps $(PROGS) test_build all_done
+@@ -82,6 +82,9 @@
+ ../afl-llvm-pass.so: afl-llvm-pass.so.cc | test_deps
+ 	$(CXX) $(CLANG_CFL) -shared $< -o $@ $(CLANG_LFL)
+ 
++../afl-llvm-tokencap-pass.so: afl-llvm-tokencap-pass.so.cc | test_deps
++	$(CXX) $(CLANG_CFL) -shared $< -o $@ $(CLANG_LFL)
++
+ ../afl-llvm-rt.o: afl-llvm-rt.o.c | test_deps
+ 	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+ 
