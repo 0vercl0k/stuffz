@@ -1,0 +1,41 @@
+diff -Naur afl-2.31b/llvm_mode/afl-clang-fast.c afl-2.31b.latest/llvm_mode/afl-clang-fast.c
+--- afl-2.31b/llvm_mode/afl-clang-fast.c 2016-08-05 23:47:48.000000000 +0100
++++ afl-2.31b.latest/llvm_mode/afl-clang-fast.c 2016-11-25 17:24:29.639531323 +0000
+@@ -128,6 +128,12 @@
+   cc_params[cc_par_cnt++] = alloc_printf("%s/afl-llvm-pass.so", obj_path);
+ #endif /* ^USE_TRACE_PC */
+
++  /* Enable tokencap */
++  cc_params[cc_par_cnt++] = "-Xclang";
++  cc_params[cc_par_cnt++] = "-load";
++  cc_params[cc_par_cnt++] = "-Xclang";
++  cc_params[cc_par_cnt++] = alloc_printf("%s/afl-llvm-tokencap-pass.so", obj_path);
++
+   cc_params[cc_par_cnt++] = "-Qunused-arguments";
+
+   /* Detect stray -v calls from ./configure scripts. */
+diff -Naur afl-2.31b/llvm_mode/Makefile afl-2.31b.latest/llvm_mode/Makefile
+--- afl-2.31b/llvm_mode/Makefile 2016-06-24 03:38:49.000000000 +0100
++++ afl-2.31b.latest/llvm_mode/Makefile 2016-11-25 17:24:29.639531323 +0000
+@@ -55,9 +55,9 @@
+ endif
+
+ ifndef AFL_TRACE_PC
+-  PROGS      = ../afl-clang-fast ../afl-llvm-pass.so ../afl-llvm-rt.o ../afl-llvm-rt-32.o ../afl-llvm-rt-64.o
++  PROGS      = ../afl-clang-fast ../afl-llvm-tokencap-pass.so ../afl-llvm-pass.so ../afl-llvm-rt.o ../afl-llvm-rt-32.o ../afl-llvm-rt-64.o
+ else
+-  PROGS      = ../afl-clang-fast ../afl-llvm-rt.o ../afl-llvm-rt-32.o ../afl-llvm-rt-64.o
++  PROGS      = ../afl-clang-fast ../afl-llvm-tokencap-pass.so ../afl-llvm-rt.o ../afl-llvm-rt-32.o ../afl-llvm-rt-64.o
+ endif
+
+ all: test_deps $(PROGS) test_build all_done
+@@ -82,6 +82,9 @@
+ ../afl-llvm-pass.so: afl-llvm-pass.so.cc | test_deps
+  $(CXX) $(CLANG_CFL) -shared $< -o $@ $(CLANG_LFL)
+
++../afl-llvm-tokencap-pass.so: afl-llvm-tokencap-pass.so.cc | test_deps
++ $(CXX) $(CLANG_CFL) -shared $< -o $@ $(CLANG_LFL)
++
+ ../afl-llvm-rt.o: afl-llvm-rt.o.c | test_deps
+  $(CC) $(CFLAGS) -fPIC -c $< -o $@
+

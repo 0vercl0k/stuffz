@@ -12,8 +12,8 @@
 #include "../config.h"
 #include "../debug.h"
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <unistd.h>
 
 #include <string>
@@ -24,7 +24,6 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 using namespace llvm;
@@ -151,7 +150,7 @@ class AFLTokenCap : public BasicBlockPass {
       /* Current module name */
       const char *m_ModuleName;
 
-      /* Dump a ConstantInt inside the token set if the 
+      /* Dump a ConstantInt inside the token set if the
       integer is valid and properly formed */
       void dump_integer_token(ConstantInt *CI) {
 
@@ -237,7 +236,7 @@ bool AFLTokenCap::runOnBasicBlock(BasicBlock &B) {
 
         if(CI == nullptr && isa<ConstantInt>(SecondOperand))
           CI = cast<ConstantInt>(SecondOperand);
-        
+
         if(CI == nullptr)
           continue;
       }
@@ -247,7 +246,7 @@ bool AFLTokenCap::runOnBasicBlock(BasicBlock &B) {
     /* Handle switch/case with integer immediates */
     else if(SwitchInst *SI = dyn_cast<SwitchInst>(&I_)) {
       for(auto &CIT : SI->cases()) {
-        
+
         ConstantInt *CI = CIT.getCaseValue();
         dump_integer_token(CI);
       }
@@ -262,7 +261,7 @@ bool AFLTokenCap::runOnBasicBlock(BasicBlock &B) {
 
       if(FunctionCalledName == nullptr)
         continue;
-      
+
       /* Walk the functions of interest */
       for(auto &FunctionOfInterest : FunctionsOfInterest) {
 
@@ -310,7 +309,7 @@ bool AFLTokenCap::runOnBasicBlock(BasicBlock &B) {
           );
 
           if(m_quiet == false && Result.second == true) {
-          
+
             OKF("Call to %s with constant \"%s\" found in %s/%s", FunctionCalledName, Result.first->c_str(), m_ModuleName, m_FunctionName);
           }
         }
