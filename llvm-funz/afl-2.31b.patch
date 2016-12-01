@@ -34,7 +34,7 @@ diff -Naur afl-2.31b/llvm_mode/Makefile afl-2.31b.latest/llvm_mode/Makefile
   $(CXX) $(CLANG_CFL) -shared $< -o $@ $(CLANG_LFL)
 
 +../afl-llvm-tokencap-pass.so: afl-llvm-tokencap-pass.so.cc | test_deps
-+ $(CXX) $(CLANG_CFL) -shared $< -o $@ $(CLANG_LFL)
++   $(CXX) $(CLANG_CFL) -shared $< -o $@ $(CLANG_LFL)
 +
  ../afl-llvm-rt.o: afl-llvm-rt.o.c | test_deps
   $(CC) $(CFLAGS) -fPIC -c $< -o $@
