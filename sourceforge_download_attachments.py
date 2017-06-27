@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 #
-#    sourceforge_dump_attachments.py - Dump attachments of a sourceforge bug
+#    sourceforge_download_attachments.py - Dump attachments of a sourceforge bug
 #    tracker.
 #    Copyright (C) 2017 Axel "0vercl0k" Souchet - http://www.twitter.com/0vercl0k
 #
