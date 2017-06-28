@@ -33,6 +33,7 @@ class DownloadFileWorker(object):
         self.where = where
 
     def __call__(self, url):
+        requests.packages.urllib3.disable_warnings()
         soup = BeautifulSoup(requests.get(url).content)
         links = soup.find_all('a')
         for link in links:
