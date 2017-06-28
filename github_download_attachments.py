@@ -36,6 +36,7 @@ class DownloadFileWorker(object):
         requests.packages.urllib3.disable_warnings()
         soup = BeautifulSoup(requests.get(url).content)
         links = soup.find_all('a')
+        n_files = 0
         for link in links:
             if len(link.attrs.keys()) != 1 or 'href' not in link.attrs:
                 continue
@@ -63,39 +64,41 @@ class DownloadFileWorker(object):
 
             with open(filepath, 'wb') as f:
                 f.write(data)
-        return True, 'ok', url
+            n_files += 1
+        return True, n_files, url
 
 def main(argc, argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--project-name', required = True, help = 'user/project-name.')
     parser.add_argument('--out', required = True, help = 'Directory where files will get downloaded.')
     args = parser.parse_args()
+    n_files, n_issues = 0, 0
     for i in range(100000):
         url = 'https://github.com/%s/issues' % args.project_name
-        print '[*] Querying page', i, '..'
         soup = BeautifulSoup(
             requests.get(
                 url, params = {'page' : i, 'q' : 'is:issue'}
             ).content
         )
         lis = soup.find_all('li')
-
         bug_urls = []
         for li in lis:
             if 'id' not in li.attrs:
                 continue
-            if li.attrs['id'].startswith('issue'):
-                bug_urls.append('https://github.com%s' % li.div.a.attrs['href'])
+            if not li.attrs['id'].startswith('issue'):
+                continue
+            bug_urls.append('https://github.com%s' % li.div.a.attrs['href'])
 
         if len(bug_urls) == 0:
             break
 
-        print '[+] Found', len(bug_urls), 'issues'
         pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
         worker = DownloadFileWorker(args.out)
-        for success, _, url in pool.imap_unordered(worker, bug_urls):
+        for success, n, url in pool.imap_unordered(worker, bug_urls):
+            n_issues += 1
             if success:
-                print '  [+] Checked', url, '\r',
+                n_files += n
+                print '[*] Downloaded', n_files, 'files (queried', n_issues, 'issues from', i, 'pages)\r',
 
         pool.close()
         pool.join()
