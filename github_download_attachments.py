@@ -26,7 +26,6 @@ import requests
 import hashlib
 import multiprocessing
 import argparse
-import ssl
 from bs4 import BeautifulSoup
 
 class DownloadFileWorker(object):
@@ -34,9 +33,6 @@ class DownloadFileWorker(object):
         self.where = where
 
     def __call__(self, url):
-        # http://thomas-cokelaer.info/blog/2016/01/python-certificate-verified-failed/
-        #                                   ¯\_(ツ)_/¯
-        ssl._create_default_https_context = ssl._create_unverified_context
         soup = BeautifulSoup(requests.get(url).content)
         links = soup.find_all('a')
         for link in links:
@@ -52,7 +48,7 @@ class DownloadFileWorker(object):
                 continue
 
             try:
-                data = requests.get(href, timeout = 20).content
+                data = requests.get(href, timeout = 20, verify = False).content
             except Exception, e:
                 print '  /!\\ Exception:', e, 'with', href
                 continue
