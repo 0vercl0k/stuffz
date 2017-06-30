@@ -22,80 +22,79 @@
 
 import sys
 import os
-import urllib2
+import requests
 import hashlib
 import multiprocessing
 import argparse
+import functools
 from bs4 import BeautifulSoup
 
-class DownloadFileWorker(object):
-    def __init__(self, where):
-        self.where = where
+onemeg = 1024 * 1024
 
-    def __call__(self, url):
-        try:
-            soup = BeautifulSoup(urllib2.urlopen(url).read())
-            attachments = soup.find_all(
-                'div', attrs = {'class' : 'attachment_thumb'}
-            )
+def download_file(where, issue_url):
+    soup = BeautifulSoup(requests.get(issue_url).content)
+    attachments = soup.find_all(
+        'div', attrs = {'class' : 'attachment_thumb'}
+    )
 
-            for attachment in attachments:
-                attachment_url = 'https://sourceforge.net%s' % attachment.a.attrs['href']
-                u = urllib2.urlopen(attachment_url, timeout = 20)
-                # if it has a Content-Length header, then we check if
-                # the file is too big or not
-                if 'Content-Length' in u.headers and int(u.headers.getheader('Content-Length'), 10) >= (1024*1024):
-                    continue
+    n_files = 0
+    for attachment in attachments:
+        attach_url = 'https://sourceforge.net%s' % attachment.a.attrs['href']
+        r = requests.get(attach_url, timeout = 20)
+        if int(r.headers.get('content-length', 0)) > onemeg:
+            continue
 
-                data = u.read()
-                sha1sum = hashlib.sha1(data).hexdigest()
-                filepath = os.path.join(self.where, sha1sum)
+        data = r.content
+        if not 0 < len(data) <= onemeg:
+            continue
 
-                # Don't download an already-downloaded file
-                if os.path.isfile(filepath):
-                    continue
+        sha1sum = hashlib.sha1(data).hexdigest()
+        filepath = os.path.join(where, sha1sum)
 
-                with open(filepath, 'wb') as f:
-                    f.write(data)
-        except Exception, e:
-            return False, str(e), url
+        # Don't download an already-downloaded file
+        if os.path.isfile(filepath):
+            continue
 
-        return True, 'ok', url
+        n_files += 1
+        with open(filepath, 'wb') as f:
+            f.write(data)
+
+    return issue_url, n_files
 
 def main(argc, argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--project-name', required = True, help = 'The project name.')
     parser.add_argument('--out', required = True, help = 'Directory where files will get downloaded.')
-    parser.add_argument('--limit', default = 1000, help = 'Number of bugs displayed per page.')
     args = parser.parse_args()
+
+    pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
+    download_file_worker = functools.partial(download_file, args.out)
+    n_files, n_issues = 0, 0
     for i in range(100000):
-        url = 'https://sourceforge.net/p/%s/bugs/?limit=%d&page=%d' % (
-            args.project_name, args.limit, i
+        url = 'https://sourceforge.net/p/%s/bugs/' % args.project_name
+        soup = BeautifulSoup(
+            requests.get(
+                url, params = {'limit' : 1000, 'page' : i}
+            ).content
         )
-        print '[*] Querying', url, '..'
-        soup = BeautifulSoup(urllib2.urlopen(url).read())
         trs = soup.find_all('tr')
         bug_urls = []
         for tr in trs:
-            if 'class' not in tr.attrs:
-                continue
-            class_ = tr.attrs['class']
+            class_ = tr.attrs.get('class', [])
             if class_ == ['even', ''] or class_ == ['', '']:
                 bug_urls.append('https://sourceforge.net%s' % tr.td.a.attrs['href'])
 
         if len(bug_urls) == 0:
             break
 
-        pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
-        worker = DownloadFileWorker(args.out)
-        for success, _, url in pool.imap_unordered(worker, bug_urls):
-            if success:
-                print '  [+] Checked', url, '\r',
+        for url, n in pool.imap_unordered(download_file_worker, bug_urls):
+            n_issues += 1
+            n_files += n
+            print '[*] Downloaded', n_files, 'files (queried', n_issues, 'issues from', i, 'pages)\r',
 
-        pool.close()
-        pool.join()
-
-    print '[+] Done.'
+    pool.close()
+    pool.join()
+    print '[+] Downloaded', n_files, 'files (queried', n_issues, 'issues).'
 
 if __name__ == '__main__':
     sys.exit(main(len(sys.argv), sys.argv))

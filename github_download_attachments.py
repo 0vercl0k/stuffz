@@ -107,7 +107,7 @@ def main(argc, argv):
 
     pool.close()
     pool.join()
-    print '[+] Downloaded', n_files, 'files (queried', n_issues, 'issues)\r',
+    print '[+] Downloaded', n_files, 'files (queried', n_issues, 'issues).'
 
 if __name__ == '__main__':
     sys.exit(main(len(sys.argv), sys.argv))
