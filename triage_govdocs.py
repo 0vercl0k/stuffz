@@ -47,21 +47,24 @@ def main(argc, argv):
         with zipfile.ZipFile(file_) as z:
             print '[*] Handling', file_
             for filepath in z.namelist():
-                _, filename = os.path.split(filepath)
-                if '.' not in filename:
-                    continue
-                _, ext = os.path.splitext(filename)
-                folderout = os.path.join(base_out, ext)
-                if not os.path.isdir(folderout):
-                    print '[*] Creating', folderout, '\r',
-                    os.mkdir(folderout)
-                fileout = os.path.join(folderout, filename)
-                if os.path.isfile(fileout):
-                    continue
-                print '[*] Extracting', filename, 'to', folderout, '\r',
-                with open(fileout, 'wb') as fout:
-                    fout.write(z.read(filepath))
-
+                try:
+                    _, filename = os.path.split(filepath)
+                    if '.' not in filename:
+                        continue
+                    _, ext = os.path.splitext(filename)
+                    folderout = os.path.join(base_out, ext)
+                    if not os.path.isdir(folderout):
+                        print '[*] Creating', folderout, '\r',
+                        os.mkdir(folderout)
+                    fileout = os.path.join(folderout, filename)
+                    if os.path.isfile(fileout):
+                        continue
+                    print '[*] Extracting', filename, 'to', folderout, '\r',
+                    with open(fileout, 'wb') as fout:
+                        fout.write(z.read(filepath))
+                except Exception, e:
+                    print '[-] Skipped', filepath, 'because', str(e)
+    print
     print '[+] Done!'
     return 1
 
