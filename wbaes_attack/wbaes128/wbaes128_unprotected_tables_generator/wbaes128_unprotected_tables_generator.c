@@ -170,7 +170,7 @@ int main()
     /// 4 -> four rows MC
     /// 0x100 -> for every char
     unsigned int Ty[4][0x100] = { 0 };
-    printf("const unsigned int Ty[4][16][0x100] =\n{\n");
+    printf("const unsigned int Ty[4][0x100] =\n{\n");
     for (size_t i = 0; i < 4; ++i)
     {
         printf("  {\n    ");
