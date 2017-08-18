@@ -369,6 +369,7 @@ int main()
         tmp1 = scrambled_key[13];
         scrambled_key[13] = scrambled_key[9];
         scrambled_key[9] = scrambled_key[5];
+        scrambled_key[5] = scrambled_key[1];
         scrambled_key[1] = tmp1;
 
         // 16-bits right rotation of the third line
