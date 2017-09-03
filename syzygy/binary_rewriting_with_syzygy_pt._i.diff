@@ -1,0 +1,347 @@
+commit 1c77a1ff5c3d83cb56dc13e0f4ea3b4c9be5ab8f
+Author: Axel '0vercl0k' Souchet <0vercl0k@tuxfamily.org>
+Date:   Sun Sep 3 12:34:10 2017 -0700
+
+    add example for 'Binary rewriting with syzygy, Pt. I'
+
+diff --git a/syzygy/instrument/instrument.gyp b/syzygy/instrument/instrument.gyp
+index 464c5566..c0eceb87 100644
+--- a/syzygy/instrument/instrument.gyp
++++ b/syzygy/instrument/instrument.gyp
+@@ -36,6 +36,8 @@
+         'instrumenters/bbentry_instrumenter.h',
+         'instrumenters/coverage_instrumenter.cc',
+         'instrumenters/coverage_instrumenter.h',
++        'instrumenters/doare_instrumenter.h',
++        'instrumenters/doare_instrumenter.cc',
+         'instrumenters/entry_call_instrumenter.cc',
+         'instrumenters/entry_call_instrumenter.h',
+         'instrumenters/entry_thunk_instrumenter.cc',
+@@ -68,6 +70,8 @@
+         'transforms/branch_hook_transform.h',
+         'transforms/coverage_transform.cc',
+         'transforms/coverage_transform.h',
++        'transforms/doare_transforms.cc',
++        'transforms/doare_transforms.h',
+         'transforms/entry_call_transform.cc',
+         'transforms/entry_call_transform.h',
+         'transforms/entry_thunk_transform.cc',
+diff --git a/syzygy/instrument/instrument_app.cc b/syzygy/instrument/instrument_app.cc
+index 72bb40b8..c54258d8 100644
+--- a/syzygy/instrument/instrument_app.cc
++++ b/syzygy/instrument/instrument_app.cc
+@@ -29,6 +29,7 @@
+ #include "syzygy/instrument/instrumenters/bbentry_instrumenter.h"
+ #include "syzygy/instrument/instrumenters/branch_instrumenter.h"
+ #include "syzygy/instrument/instrumenters/coverage_instrumenter.h"
++#include "syzygy/instrument/instrumenters/doare_instrumenter.h"
+ #include "syzygy/instrument/instrumenters/entry_call_instrumenter.h"
+ #include "syzygy/instrument/instrumenters/entry_thunk_instrumenter.h"
+ #include "syzygy/instrument/instrumenters/flummox_instrumenter.h"
+@@ -41,7 +42,7 @@ static const char kUsageFormatStr[] =
+     "Usage: %ls [options]\n"
+     "  Required arguments:\n"
+     "    --input-image=<path> The input image to instrument.\n"
+-    "    --mode=afl|asan|bbentry|branch|calltrace|coverage|flummox|profile\n"
++    "    --mode=afl|asan|bbentry|branch|calltrace|coverage|doare|flummox|profile\n"
+     "                            Specifies which instrumentation mode is to\n"
+     "                            be used. If this is not specified it is\n"
+     "                            equivalent to specifying --mode=calltrace\n"
+@@ -192,6 +193,8 @@ bool InstrumentApp::ParseCommandLine(const base::CommandLine* cmd_line) {
+           instrumenters::EntryThunkInstrumenter::CALL_TRACE));
+     } else if (base::LowerCaseEqualsASCII(mode, "coverage")) {
+       instrumenter_.reset(new instrumenters::CoverageInstrumenter());
++    } else if (base::LowerCaseEqualsASCII(mode, "doare")) {
++      instrumenter_.reset(new instrumenters::DoareInstrumenter());
+     } else if (base::LowerCaseEqualsASCII(mode, "flummox")) {
+       instrumenter_.reset(new instrumenters::FlummoxInstrumenter());
+     } else if (base::LowerCaseEqualsASCII(mode, "profile")) {
+diff --git a/syzygy/instrument/instrumenters/doare_instrumenter.cc b/syzygy/instrument/instrumenters/doare_instrumenter.cc
+new file mode 100644
+index 00000000..05b612c6
+--- /dev/null
++++ b/syzygy/instrument/instrumenters/doare_instrumenter.cc
+@@ -0,0 +1,31 @@
++// Axel '0vercl0k' Souchet - 26 Aug 2017
++
++#include "syzygy/instrument/instrumenters/doare_instrumenter.h"
++
++#include "base/logging.h"
++#include "base/values.h"
++#include "syzygy/application/application.h"
++
++namespace instrument {
++namespace instrumenters {
++
++bool DoareInstrumenter::InstrumentPrepare() {
++  return true;
++}
++
++bool DoareInstrumenter::InstrumentImpl() {
++  transformer_callgraph_.reset(new instrument::transforms::CallGraphAnalysis());
++
++  if (!relinker_->AppendTransform(transformer_callgraph_.get())) {
++    LOG(ERROR) << "AppendTransform failed.";
++    return false;
++  }
++
++  return true;
++}
++
++const char* DoareInstrumenter::InstrumentationMode() {
++  return "Diary of a reverse engineer";
++}
++}  // namespace instrumenters
++}  // namespace instrument
+diff --git a/syzygy/instrument/instrumenters/doare_instrumenter.h b/syzygy/instrument/instrumenters/doare_instrumenter.h
+new file mode 100644
+index 00000000..4c93f1f9
+--- /dev/null
++++ b/syzygy/instrument/instrumenters/doare_instrumenter.h
+@@ -0,0 +1,36 @@
++// Axel '0vercl0k' Souchet - 26 Aug 2017
++
++#ifndef SYZYGY_INSTRUMENT_INSTRUMENTERS_DOARE_INSTRUMENTER_H_
++#define SYZYGY_INSTRUMENT_INSTRUMENTERS_DOARE_INSTRUMENTER_H_
++
++#include "base/command_line.h"
++#include "syzygy/instrument/instrumenters/instrumenter_with_agent.h"
++#include "syzygy/instrument/transforms/doare_transforms.h"
++#include "syzygy/pe/pe_relinker.h"
++
++namespace instrument {
++namespace instrumenters {
++
++class DoareInstrumenter : public InstrumenterWithRelinker {
++ public:
++  typedef InstrumenterWithRelinker Super;
++
++  DoareInstrumenter() : Super() {}
++
++  // From InstrumenterWithRelinker
++  bool InstrumentPrepare() override;
++  bool InstrumentImpl() override;
++  const char* InstrumentationMode() override;
++
++ private:
++  // The transform for this agent.
++  std::unique_ptr<instrument::transforms::CallGraphAnalysis>
++      transformer_callgraph_;
++
++  DISALLOW_COPY_AND_ASSIGN(DoareInstrumenter);
++};
++
++}  // namespace instrumenters
++}  // namespace instrument
++
++#endif  // SYZYGY_INSTRUMENT_INSTRUMENTERS_DOARE_INSTRUMENTER_H_
+diff --git a/syzygy/instrument/transforms/doare_transforms.cc b/syzygy/instrument/transforms/doare_transforms.cc
+new file mode 100644
+index 00000000..c88d0157
+--- /dev/null
++++ b/syzygy/instrument/transforms/doare_transforms.cc
+@@ -0,0 +1,147 @@
++// Axel '0vercl0k' Souchet - 26 Aug 2017
++
++#include "syzygy/instrument/transforms/doare_transforms.h"
++#include <iostream>
++
++namespace instrument {
++namespace transforms {
++
++const char CallGraphAnalysis::kTransformName[] = "CallGraphAnalysis";
++
++bool CallGraphAnalysis::OnBlock(const TransformPolicyInterface* policy,
++                                BlockGraph* block_graph,
++                                Block* block) {
++  total_blocks_++;
++
++  if (block->type() != BlockGraph::CODE_BLOCK)
++    return true;
++
++  if (block->attributes() & BlockGraph::GAP_BLOCK)
++    return true;
++
++  VLOG(1) << __FUNCTION__ << ": " << block->name();
++  if (block->name() == "main") {
++    main_block_ = block;
++  }
++
++  // Walk the referrers of this block.
++  for (const auto& referrer : block->referrers()) {
++    Block* referrer_block(referrer.first);
++
++    // We are not interested in non-code referrers.
++    if (referrer_block->type() != BlockGraph::CODE_BLOCK) {
++      continue;
++    }
++
++    VLOG(1) << referrer_block->name() << " -> " << block->name();
++
++    // Keep track of the relation between the block & its referrer.
++    edges_.emplace_back(referrer_block, block);
++  }
++
++  total_code_blocks_++;
++  return true;
++}
++
++bool CallGraphAnalysis::PostBlockGraphIteration(
++    const TransformPolicyInterface* policy,
++    BlockGraph* block_graph,
++    Block* header_block) {
++  VLOG(1) << "      Blocks found: " << total_blocks_;
++  VLOG(1) << " Code Blocks found: " << total_code_blocks_;
++
++  if (main_block_ == nullptr) {
++    LOG(ERROR) << "A 'main' block is mandatory.";
++    return false;
++  }
++
++  // Now we walk the graph from the 'main' block, with a BFS algorithm.
++  uint32_t idx = 0, level = 0;
++  std::list<std::pair<Block*, Block*>> selected_edges;
++  std::map<Block*, uint32_t> selected_nodes;
++  std::map<Block*, uint32_t> selected_nodes_levels;
++  std::set<Block*> nodes_to_inspect{main_block_};
++  while (nodes_to_inspect.size() > 0) {
++    // Make a copy of the node to inspect so that we can iterate
++    // over them.
++    std::set<Block*> tmp = nodes_to_inspect;
++
++    // The node selected to be inspected in the next iteration of
++    // the loop will be added in this set.
++    nodes_to_inspect.clear();
++
++    // Go through every nodes to find to what nodes they are connected
++    // to.
++    for (const auto& node_to_inspect : tmp) {
++      // Assign an index and a level to the node.
++      selected_nodes.emplace(node_to_inspect, idx++);
++      selected_nodes_levels[node_to_inspect] = level;
++
++      // Now let's iterate through the edges to find to what nodes, the current
++      // one is connected to.
++      for (const auto& edge : edges_) {
++        // We are interested to find edges connected to the current node.
++        if (edge.first != node_to_inspect) {
++          continue;
++        }
++
++        // Get the connected node and make sure we haven't handled it already.
++        Block* to_block(edge.second);
++        if (selected_nodes.count(to_block) > 0) {
++          continue;
++        }
++
++        selected_nodes.emplace(to_block, idx++);
++        selected_nodes_levels[to_block] = level + 1;
++
++        // If it's a
++        selected_edges.emplace_back(node_to_inspect, to_block);
++
++        // We need to analyze this block at the next iteration (level + 1).
++        nodes_to_inspect.insert(to_block);
++      }
++    }
++
++    // Bump the level as we finished analyzing the nodes we wanted to inspect.
++    level++;
++  }
++
++  std::cout << "var nodes = new vis.DataSet([" << std::endl;
++  for (const auto& node : selected_nodes) {
++    Block* block(node.first);
++    const char* compiland_path = block->compiland_name().c_str();
++    const char* compiland_name = strrchr(compiland_path, '\\');
++    char description[1024];
++
++    if (compiland_name != nullptr) {
++      compiland_name++;
++    } else {
++      compiland_name = "Unknown";
++    }
++
++    uint32_t level = selected_nodes_levels[block];
++    _snprintf_s(description, ARRAYSIZE(description), _TRUNCATE,
++                "RVA: %p<br>Size: %d<br>Level: %d<br>Compiland: %s",
++                (void*)block->addr().value(), block->size(), level,
++                compiland_name);
++
++    std::cout << "  { id : " << node.second << ", label : \"" << block->name()
++              << "\", "
++              << "title : '" << description << "', group : " << level
++              << ", value : " << block->size() << " }," << std::endl;
++  }
++  std::cout << "]);" << std::endl
++            << std::endl;
++
++  std::cout << "var edges = new vis.DataSet([" << std::endl;
++  for (const auto& edge : selected_edges) {
++    std::cout << "  { from : " << selected_nodes.at(edge.first)
++              << ", to : " << selected_nodes.at(edge.second) << " },"
++              << std::endl;
++  }
++  std::cout << "]);" << std::endl;
++  return true;
++}
++
++}  // namespace transforms
++}  // namespace instrument
+diff --git a/syzygy/instrument/transforms/doare_transforms.h b/syzygy/instrument/transforms/doare_transforms.h
+new file mode 100644
+index 00000000..59f64a17
+--- /dev/null
++++ b/syzygy/instrument/transforms/doare_transforms.h
+@@ -0,0 +1,51 @@
++// Axel '0vercl0k' Souchet - 26 Aug 2017
++
++#ifndef SYZYGY_INSTRUMENT_TRANSFORMS_DOARE_TRANSFORMS_H_
++#define SYZYGY_INSTRUMENT_TRANSFORMS_DOARE_TRANSFORMS_H_
++
++#include "base/logging.h"
++#include "syzygy/block_graph/transform_policy.h"
++#include "syzygy/block_graph/transforms/iterative_transform.h"
++#include "syzygy/block_graph/transforms/named_transform.h"
++
++namespace instrument {
++namespace transforms {
++
++typedef block_graph::BlockGraph BlockGraph;
++typedef block_graph::BlockGraph::Block Block;
++typedef block_graph::TransformPolicyInterface TransformPolicyInterface;
++
++class CallGraphAnalysis
++    : public block_graph::transforms::IterativeTransformImpl<
++          CallGraphAnalysis> {
++ public:
++  CallGraphAnalysis()
++      : edges_(),
++        main_block_(nullptr),
++        total_blocks_(0),
++        total_code_blocks_(0) {}
++
++  static const char kTransformName[];
++
++  // Functions needed for IterativeTransform.
++  bool OnBlock(const TransformPolicyInterface* policy,
++               BlockGraph* block_graph,
++               Block* block);
++
++  bool PostBlockGraphIteration(const TransformPolicyInterface* policy,
++                               BlockGraph* block_graph,
++                               Block* header_block);
++
++ private:
++  std::list<std::pair<Block*, Block*>> edges_;
++  Block* main_block_;
++
++  // Stats.
++  size_t total_blocks_;
++  size_t total_code_blocks_;
++};
++
++}  // namespace transforms
++}  // namespace instrument
++
++#endif  // SYZYGY_INSTRUMENT_TRANSFORMS_DOARE_TRANSFORMS_H_
