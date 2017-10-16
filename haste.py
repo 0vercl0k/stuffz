@@ -39,7 +39,7 @@ def main(argc, argv):
         _, host = u.netloc.split('@')
         server_url = '%s://%s%s' % (u.scheme, host, u.path)
 
-    print '%s/%s' % (server_url, json.loads(r.text)['key'])
+    print '%s%s' % (server_url, json.loads(r.text)['key'])
     return 1
 
 if __name__ == '__main__':
