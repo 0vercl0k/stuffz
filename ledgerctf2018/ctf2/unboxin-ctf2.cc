@@ -786,7 +786,7 @@ void init_globals() {
     memcpy(mask3.m128i_u8, mask3_bytes, 16);
     memcpy(shiftedmask.m128i_u8, shiftedmask_bytes, 16);
 
-    FILE *fin = fopen(R"(C:\work\challenges\ledgerctf\ctf2\ctf2)", "rb");
+    FILE *fin = fopen("ctf2", "rb");
     fseek(fin, sboxes_off, SEEK_SET);
     fread(sboxes, sboxes_size, 1, fin);
     fclose(fin);
@@ -840,44 +840,6 @@ void pwn() {
         printf("%.2X", Password[i]);
     }
     printf("\n");
-}
-
-void recover_key() {
-    uint8_t Input[16];
-    for (uint8_t i = 0; i < 16; ++i) {
-        Input[i] = i;
-    }
-
-    printf("Cleartext:\n");
-    hexdump(stdout, Input, 16);
-
-    Slot_t InputSlot;
-    memcpy(InputSlot.m128i_u8, Input, 16);
-    for (uint32_t i = 1; i < 3; ++i) {
-        round(i, &InputSlot);
-    }
-
-    Slot_t Key;
-    memcpy(Key.m128i_u8, Input, 16);
-    for (uint32_t i = 1; i < 4; ++i) {
-        round(i, &Key);
-    }
-
-    for (size_t i = 0; i < 16; ++i) {
-        Key.m128i_u8[i] ^= InputSlot.m128i_u8[i];
-    }
-
-    printf("Key?\n");
-    hexdump(stdout, Key.m128i_u8, 16);
-    
-    Slot_t Cipher;
-    memcpy(Cipher.m128i_u8, Input, 16);
-    for (uint32_t i = 0; i < 40; ++i) {
-        round(i, &Cipher);
-    }
-
-    printf("Ciphered:\n");
-    hexdump(stdout, Cipher.m128i_u8, 16);
 }
 
 bool tests() {
