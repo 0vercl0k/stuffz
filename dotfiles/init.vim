@@ -20,14 +20,14 @@ endif
 source $VIMRUNTIME/mswin.vim
 "" Allow to select text with the mouse
 set mouse=a
-" Line numbers on the left side
+"" Line numbers on the left side
 set number
-" tab -> 4spaces
+"" tab -> 4spaces
 set tabstop=4 shiftwidth=4 expandtab
-" Solarized theme
+"" Solarized theme
 set background=dark
 colorscheme solarized8
-" py2 annaconda
+"" py2 annaconda
 let g:python_host_prog = 'C:/ProgramData/Anaconda2/python.exe'
 
 " Plugins
@@ -58,4 +58,5 @@ let g:indentLine_char = '.'
 let g:airline#extensions#tabline#enabled = 1
 
 "" vim-airline-themes
+""" Solarized dark theme for vim-airline
 let g:airline_solarized_bg = 'dark'
