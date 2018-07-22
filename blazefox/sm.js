@@ -42,6 +42,7 @@ function heapslot_to_objectelements(Addr) {
         'js.exe',
         'js::ObjectElements*'
     );
+
     return ObjectElements;
 }
 
@@ -299,14 +300,12 @@ function smdump_jsobject(Addr) {
             Logger('    Property: ' + get_property_from_shape(CurrentShape));
             CurrentShape = CurrentShape.parent.value;
         }
-        // Logger('   BaseShape: ' + BaseShape.address.toString(16));
     }
 
     if(ClassName == 'Function') {
         smdump_jsfunction(Addr);
     } else if(ClassName == 'Array') {
         smdump_jsarray(Addr);
-    } else {
     }
 }
 
