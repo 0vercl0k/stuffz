@@ -22,6 +22,12 @@ const JSVAL_TYPE_OBJECT = host.Int64(0x1fffc);
 const INLINE_CHARS_BIT = host.Int64(1 << 3);
 const LATIN1_CHARS_BIT = host.Int64(1 << 6);
 
+const JSID_TYPE_MASK = host.Int64(0x7);
+const JSID_TYPE_STRING = host.Int64(0x0);
+const JSID_TYPE_INT = host.Int64(0x1);
+const JSID_TYPE_VOID = host.Int64(0x2);
+const JSID_TYPE_SYMBOL = host.Int64(0x4);
+
 function read_u64(addr) {
     return host.memory.readMemoryValues(addr, 1, 8)[0];
 }
@@ -130,7 +136,7 @@ class __JSArray {
             Addr,
             'js.exe',
             'js::ArrayObject*'
-        ); 
+        );
         // XXX: why doesn't it work?
         // this.Obj.elements_.value.address
         this._Content = this._Obj.elements_.address;
@@ -215,6 +221,33 @@ function smdump_jsstring(Addr) {
     Logger("'" + JSString + "'");
 }
 
+function jsid_is_int(Propid) {
+    const Bits = Propid.value.asBits;
+    return Bits.bitwiseAnd(JSID_TYPE_MASK).compareTo(JSID_TYPE_INT) == 0;
+}
+
+function jsid_is_string(Propid) {
+    const Bits = Propid.value.asBits;
+    return Bits.bitwiseAnd(JSID_TYPE_MASK).compareTo(JSID_TYPE_STRING) == 0;
+}
+
+function get_property_from_shape(Shape) {
+    const Propid = Shape.propid_;
+    if(jsid_is_int(Propid)) {
+        return Propid.value.asBits.bitwiseShiftRight(1);
+    }
+
+    if(jsid_is_string(Propid)) {
+        return new __JSString(Propid.value.asBits);
+    }
+
+    if(jsid_is_symbol(Propid)) {
+        return ;
+    }
+
+    throw 'todo';
+}
+
 function smdump_jsobject(Addr) {
     /* JSObject.h
      * A JavaScript object.
@@ -241,22 +274,7 @@ function smdump_jsobject(Addr) {
      *          - Implies nothing about the current object or target object. Either
      *            of which may mutate in place. Store a JSObject* only to save
      *            space, not to guard on.
-     *
-     * NOTE: The JIT may check |shapeOrExpando_| pointer value without ever
-     *       inspecting |group_| or the class.
-     *
-     * NOTE: Some operations can change the contents of an object (including class)
-     *       in-place so avoid assuming an object with same pointer has same class
-     *       as before.
-     *       - JSObject::swap()
-     *       - UnboxedPlainObject::convertToNative()
-     *
-     * NOTE: UnboxedObjects may change class without changing |group_|.
-     *       - js::TryConvertToUnboxedLayout
      */
-    // 0:000> dt js!JSObject
-    //    +0x000 group_           : js::GCPtr<js::ObjectGroup *>
-    //    +0x008 shapeOrExpando_  : Ptr64 Void
     const Logger = function (Content) {
         logln(Addr.toString(16) + ': js!JSObject: ' + Content);
     };
@@ -273,17 +291,22 @@ function smdump_jsobject(Addr) {
         );
         const BaseShape = Shape.base_.value;
         const Delegate = BaseShape.flags.bitwiseAnd(FLAG_DELEGATE).compareTo(0) != 0;
-        Logger('[Object ' + ClassName + ']'); 
-        // Logger('       Shape: ' + Shape.address.toString(16));
+        Logger('[Object ' + ClassName + ']');
+        Logger('  Shape: ' + Shape.address.toString(16));
+
+        let CurrentShape = Shape;
+        while(CurrentShape.parent.value.address.compareTo(0) != 0) {
+            Logger('    Property: ' + get_property_from_shape(CurrentShape));
+            CurrentShape = CurrentShape.parent.value;
+        }
         // Logger('   BaseShape: ' + BaseShape.address.toString(16));
     }
-    // Logger('       Group: ' + Group.address.toString(16));
+
     if(ClassName == 'Function') {
-        smdump_jsfunction(Addr);    
+        smdump_jsfunction(Addr);
     } else if(ClassName == 'Array') {
-    	smdump_jsarray(Addr);
+        smdump_jsarray(Addr);
     } else {
-        Logger('  ClassName: ' + ClassName);
     }
 }
 
