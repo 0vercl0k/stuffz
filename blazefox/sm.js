@@ -54,7 +54,88 @@ function byte_to_str(Byte) {
     if(printable(Byte)) {
         return String.fromCharCode(Byte);
     }
+
     return '\\x' + Byte.toString(16).padStart(2, '0');
+}
+
+function jsid_is_int(Propid) {
+    const Bits = Propid.value.asBits;
+    return Bits.bitwiseAnd(JSID_TYPE_MASK).compareTo(JSID_TYPE_INT) == 0;
+}
+
+function jsid_is_string(Propid) {
+    const Bits = Propid.value.asBits;
+    return Bits.bitwiseAnd(JSID_TYPE_MASK).compareTo(JSID_TYPE_STRING) == 0;
+}
+
+function get_property_from_shape(Shape) {
+    const Propid = Shape.propid_;
+    if(jsid_is_int(Propid)) {
+        return Propid.value.asBits.bitwiseShiftRight(1);
+    }
+
+    if(jsid_is_string(Propid)) {
+        return new __JSString(Propid.value.asBits);
+    }
+
+    // XXX: todo
+}
+
+function jsvalue_to_instance(Addr) {
+    const JSValue = new __JSValue(Addr);
+    const Types = {
+        [JSVAL_TYPE_INT32] : __JSInt32,
+        [JSVAL_TYPE_STRING] : __JSString,
+        [JSVAL_TYPE_UNDEFINED] : __JSUndefined,
+        [JSVAL_TYPE_BOOLEAN] : __JSBoolean,
+        [JSVAL_TYPE_NULL] : __JSNull,
+        [JSVAL_TYPE_OBJECT] : __JSObject
+    };
+
+    if(!Types.hasOwnProperty(JSValue.Tag)) {
+        return 'Dunno';
+    }
+
+    const Type = Types[JSValue.Tag];
+    return new Type(JSValue.Payload);
+}
+
+class __JSNull {
+    constructor(Addr) {
+    }
+
+    toString() {
+        return 'null';
+    }
+}
+
+class __JSUndefined {
+    constructor(Addr) {
+    }
+
+    toString() {
+        return 'undefined';
+    }
+}
+
+class __JSBoolean {
+    constructor(Addr) {
+        this._Value = Addr.compareTo(1) == 0 ? true : false;
+    }
+
+    toString() {
+        return this._Value.toString();
+    }
+}
+
+class __JSInt32 {
+    constructor(Addr) {
+        this._Value = Addr.bitwiseAnd(0xffffffff);
+    }
+
+    toString() {
+        return '0x' + this._Value.toString(16);
+    }
 }
 
 class __JSString {
@@ -110,7 +191,7 @@ class __JSString {
     }
 
     toString() {
-        return this._String;
+        return "'" + this._String + "'";
     }
 }
 
@@ -155,11 +236,13 @@ class __JSArray {
     }
 
     toString() {
+        const Max = 5;
         const Content = [];
-        for(let Idx = 0; Idx < this.Length; ++Idx) {
-            Content.push(this._Content.add(Idx * 8));
+        for(let Idx = 0; Idx < Math.min(Max, this.Length); ++Idx) {
+            const Addr = this._Content.add(Idx * 8);
+            Content.push(jsvalue_to_instance(Addr).toString());
         }
-        return '[' + Content.join(', ') + ']';
+        return '[' + Content.join(', ') + (this.Length > Max ? ', ...' : '') + ']';
     }
 }
 
@@ -185,12 +268,39 @@ class __JSFunction {
     }
 }
 
+class __JSObject {
+    constructor(Addr) {
+        this._Addr = Addr;
+        this._Obj = host.createPointerObject(
+            this._Addr,
+            'js.exe',
+            'JSObject*'
+        );
+
+        const Group = this._Obj.group_.value;
+        this._ClassName = host.memory.readString(Group.clasp_.name);
+    }
+
+    toString() {
+        if(this._ClassName == 'Object') {
+            return '[Object]';
+        }
+
+        if(this._ClassName == 'Array') {
+            return new __JSArray(this._Addr).toString();
+        }
+
+        return 'Dunno';
+    }
+}
+
 function smdump_jsint32(Addr) {
     const Logger = function (Content) {
         logln(Addr.toString(16) + ': JSVAL_TYPE_INT32: ' + Content);
     };
 
-    Logger('JSVAL_TYPE_INT32: 0x' + Addr.bitwiseAnd(0xffffffff).toString(16));
+    const JSInt32 = new __JSInt32(Addr);
+    Logger(JSInt32);
 }
 
 function smdump_jsfunction(Addr) {
@@ -199,7 +309,7 @@ function smdump_jsfunction(Addr) {
     };
 
     const JSFunction = new __JSFunction(Addr);
-    Logger('Name: ' + JSFunction);
+    Logger(JSFunction);
 }
 
 function smdump_jsarray(Addr) {
@@ -219,34 +329,7 @@ function smdump_jsstring(Addr) {
     };
 
     const JSString = new __JSString(Addr);
-    Logger("'" + JSString + "'");
-}
-
-function jsid_is_int(Propid) {
-    const Bits = Propid.value.asBits;
-    return Bits.bitwiseAnd(JSID_TYPE_MASK).compareTo(JSID_TYPE_INT) == 0;
-}
-
-function jsid_is_string(Propid) {
-    const Bits = Propid.value.asBits;
-    return Bits.bitwiseAnd(JSID_TYPE_MASK).compareTo(JSID_TYPE_STRING) == 0;
-}
-
-function get_property_from_shape(Shape) {
-    const Propid = Shape.propid_;
-    if(jsid_is_int(Propid)) {
-        return Propid.value.asBits.bitwiseShiftRight(1);
-    }
-
-    if(jsid_is_string(Propid)) {
-        return new __JSString(Propid.value.asBits);
-    }
-
-    if(jsid_is_symbol(Propid)) {
-        return ;
-    }
-
-    throw 'todo';
+    Logger(JSString);
 }
 
 function smdump_jsobject(Addr) {
@@ -314,7 +397,8 @@ function smdump_jsundefined(Addr) {
         logln(Addr.toString(16) + ': JSVAL_TYPE_UNDEFINED: ' + Content);
     };
 
-    Logger('undefined');
+    const Undefined = new __JSUndefined(Addr);
+    Logger(Undefined);
 }
 
 function smdump_jsboolean(Addr) {
@@ -322,7 +406,8 @@ function smdump_jsboolean(Addr) {
         logln(Addr.toString(16) + ': JSVAL_TYPE_BOOLEAN: ' + Content);
     };
 
-    Logger(Addr.compareTo(1) == 0 ? 'true' : 'false');
+    const JSBoolean = new __JSBoolean(Addr);
+    Logger(JSBoolean);
 }
 
 function smdump_jssymbol(Addr) {
