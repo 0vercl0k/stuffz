@@ -101,18 +101,12 @@ function jsvalue_to_instance(Addr) {
 }
 
 class __JSNull {
-    constructor(Addr) {
-    }
-
     toString() {
         return 'null';
     }
 }
 
 class __JSUndefined {
-    constructor(Addr) {
-    }
-
     toString() {
         return 'undefined';
     }
