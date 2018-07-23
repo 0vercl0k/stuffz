@@ -28,6 +28,9 @@ const JSID_TYPE_INT = host.Int64(0x1);
 const JSID_TYPE_VOID = host.Int64(0x2);
 const JSID_TYPE_SYMBOL = host.Int64(0x4);
 
+const SLOT_MASK = host.Int64(0xffffff);
+const FIXED_SLOTS_SHIFT = host.Int64(27);
+
 function read_u64(addr) {
     return host.memory.readMemoryValues(addr, 1, 8)[0];
 }
@@ -69,6 +72,7 @@ function jsid_is_string(Propid) {
 }
 
 function get_property_from_shape(Shape) {
+    // XXX: expose a smdump_jsid
     const Propid = Shape.propid_;
     if(jsid_is_int(Propid)) {
         return Propid.value.asBits.bitwiseShiftRight(1);
@@ -192,9 +196,8 @@ class __JSString {
 class __JSValue {
     constructor(Addr) {
         this._Addr = Addr;
-        const Value = read_u64(this._Addr);
-        this._Tag = Value.bitwiseShiftRight(JSVAL_TAG_SHIFT);
-        this._Payload = Value.bitwiseAnd(JSVAL_PAYLOAD_MASK);
+        this._Tag = this._Addr.bitwiseShiftRight(JSVAL_TAG_SHIFT);
+        this._Payload = this._Addr.bitwiseAnd(JSVAL_PAYLOAD_MASK);
     }
 
     get Payload() {
@@ -234,7 +237,8 @@ class __JSArray {
         const Content = [];
         for(let Idx = 0; Idx < Math.min(Max, this.Length); ++Idx) {
             const Addr = this._Content.add(Idx * 8);
-            Content.push(jsvalue_to_instance(Addr).toString());
+            const JSValue = read_u64(Addr);
+            Content.push(jsvalue_to_instance(JSValue).toString());
         }
         return '[' + Content.join(', ') + (this.Length > Max ? ', ...' : '') + ']';
     }
@@ -263,6 +267,32 @@ class __JSFunction {
 }
 
 class __JSObject {
+    /* JSObject.h
+     * A JavaScript object.
+     *
+     * This is the base class for all objects exposed to JS script (as well as some
+     * objects that are only accessed indirectly). Subclasses add additional fields
+     * and execution semantics. The runtime class of an arbitrary JSObject is
+     * identified by JSObject::getClass().
+     *
+     * The members common to all objects are as follows:
+     *
+     * - The |group_| member stores the group of the object, which contains its
+     *   prototype object, its class and the possible types of its properties.
+     *
+     * - The |shapeOrExpando_| member points to (an optional) guard object that JIT
+     *   may use to optimize. The pointed-to object dictates the constraints
+     *   imposed on the JSObject:
+     *      nullptr
+     *          - Safe value if this field is not needed.
+     *      js::Shape
+     *          - All objects that might point |shapeOrExpando_| to a js::Shape
+     *            must follow the rules specified on js::ShapedObject.
+     *      JSObject
+     *          - Implies nothing about the current object or target object. Either
+     *            of which may mutate in place. Store a JSObject* only to save
+     *            space, not to guard on.
+     */
     constructor(Addr) {
         this._Addr = Addr;
         this._Obj = host.createPointerObject(
@@ -271,17 +301,95 @@ class __JSObject {
             'JSObject*'
         );
 
+        this._Properties = [];
         const Group = this._Obj.group_.value;
         this._ClassName = host.memory.readString(Group.clasp_.name);
+        const NonNative = Group.clasp_.flags.bitwiseAnd(CLASS_NON_NATIVE).compareTo(0) != 0;
+        if(NonNative) {
+            return;
+        }
+
+        const Shape = host.createPointerObject(
+            this._Obj.shapeOrExpando_.address,
+            'js.exe',
+            'js::Shape*'
+        );
+
+        const NativeObject = host.createPointerObject(Addr, 'js.exe', 'js::NativeObject*');
+
+        if(this._ClassName == 'Array') {
+
+            //
+            // Optimization for 'length' property if 'Array' cf
+            // js::ArrayObject::length / js::GetLengthProperty
+            //
+
+            const ObjectElements = heapslot_to_objectelements(NativeObject.elements_.address);
+            this._Properties.push('length : ' + ObjectElements.length);
+            return;
+        }
+
+        //
+        // Walk the list of Shapes and get the property names
+        //
+
+        const Properties = {};
+        let CurrentShape = Shape;
+        while(CurrentShape.parent.value.address.compareTo(0) != 0) {
+            const SlotIdx = CurrentShape.slotInfo.bitwiseAnd(SLOT_MASK).asNumber();
+            Properties[SlotIdx] = get_property_from_shape(CurrentShape);
+            CurrentShape = CurrentShape.parent.value;
+        }
+
+
+        //
+        // Walk the slots to get the values now (check NativeGetPropertyInline/GetExistingProperty)
+        //
+
+        const NativeObjectTypeSize = host.getModuleType('js.exe', 'js::NativeObject').size;
+        const NativeObjectElements = NativeObject.address.add(NativeObjectTypeSize);
+        const NativeObjectSlots = NativeObject.slots_.address;
+        const Max = Shape.slotInfo.bitwiseShiftRight(FIXED_SLOTS_SHIFT).asNumber();
+        for(let Idx = 0; Idx < Object.keys(Properties).length; Idx++) {
+
+            //
+            // Check out NativeObject::getSlot()
+            //
+
+            const PropertyName = Properties[Idx];
+            let PropertyValue = undefined;
+            let ElementAddr = undefined;
+            if(Idx < Max) {
+                ElementAddr = NativeObjectElements.add(Idx * 8);
+            } else {
+                ElementAddr = NativeObjectSlots.add((Idx - Max) * 8);
+            }
+
+            const JSValue = read_u64(ElementAddr);
+            PropertyValue = jsvalue_to_instance(JSValue);
+            this._Properties.push(PropertyName + ' : ' + PropertyValue);
+        }
+    }
+
+    get Properties() {
+        return this._Properties;
+    }
+
+    get ClassName() {
+        return this._ClassName;
     }
 
     toString() {
-        if(this._ClassName == 'Object') {
-            return '[Object]';
-        }
-
         if(this._ClassName == 'Array') {
             return new __JSArray(this._Addr).toString();
+        }
+
+        if(this._Properties != undefined && this._Properties.length > 0) {
+            return '{' + this._Properties.join(', ') + '}';
+        }
+
+        if(this._ClassName == 'Object') {
+            return '[Object]';
         }
 
         return 'Dunno';
@@ -324,66 +432,6 @@ function smdump_jsstring(Addr) {
 
     const JSString = new __JSString(Addr);
     Logger(JSString);
-}
-
-function smdump_jsobject(Addr) {
-    /* JSObject.h
-     * A JavaScript object.
-     *
-     * This is the base class for all objects exposed to JS script (as well as some
-     * objects that are only accessed indirectly). Subclasses add additional fields
-     * and execution semantics. The runtime class of an arbitrary JSObject is
-     * identified by JSObject::getClass().
-     *
-     * The members common to all objects are as follows:
-     *
-     * - The |group_| member stores the group of the object, which contains its
-     *   prototype object, its class and the possible types of its properties.
-     *
-     * - The |shapeOrExpando_| member points to (an optional) guard object that JIT
-     *   may use to optimize. The pointed-to object dictates the constraints
-     *   imposed on the JSObject:
-     *      nullptr
-     *          - Safe value if this field is not needed.
-     *      js::Shape
-     *          - All objects that might point |shapeOrExpando_| to a js::Shape
-     *            must follow the rules specified on js::ShapedObject.
-     *      JSObject
-     *          - Implies nothing about the current object or target object. Either
-     *            of which may mutate in place. Store a JSObject* only to save
-     *            space, not to guard on.
-     */
-    const Logger = function (Content) {
-        logln(Addr.toString(16) + ': js!JSObject: ' + Content);
-    };
-
-    const JSObject = host.createPointerObject(Addr, 'js.exe', 'JSObject*');
-    const Group = JSObject.group_.value;
-    const ClassName = host.memory.readString(Group.clasp_.name);
-    const NonNative = Group.clasp_.flags.bitwiseAnd(CLASS_NON_NATIVE).compareTo(0) != 0;
-    if(!NonNative) {
-        const Shape = host.createPointerObject(
-            JSObject.shapeOrExpando_.address,
-            'js.exe',
-            'js::Shape*'
-        );
-        const BaseShape = Shape.base_.value;
-        const Delegate = BaseShape.flags.bitwiseAnd(FLAG_DELEGATE).compareTo(0) != 0;
-        Logger('[Object ' + ClassName + ']');
-        Logger('  Shape: ' + Shape.address.toString(16));
-
-        let CurrentShape = Shape;
-        while(CurrentShape.parent.value.address.compareTo(0) != 0) {
-            Logger('    Property: ' + get_property_from_shape(CurrentShape));
-            CurrentShape = CurrentShape.parent.value;
-        }
-    }
-
-    if(ClassName == 'Function') {
-        smdump_jsfunction(Addr);
-    } else if(ClassName == 'Array') {
-        smdump_jsarray(Addr);
-    }
 }
 
 function smdump_jsundefined(Addr) {
@@ -430,10 +478,38 @@ function smdump_jsnull(Addr) {
     Logger('null');
 }
 
+function smdump_jsobject(Addr) {
+    const Logger = function (Content) {
+        logln(Addr.toString(16) + ': js!JSObject: ' + Content);
+    };
+
+    if(Addr.hasOwnProperty('address')) {
+        Addr = Addr.address;
+    }
+
+    const JSObject = new __JSObject(Addr);
+    const ClassName = JSObject.ClassName;
+
+    if(ClassName == 'Function') {
+        smdump_jsfunction(Addr);
+    } else if(ClassName == 'Array') {
+        smdump_jsarray(Addr);
+    } else {
+        Logger(' { ' + JSObject.Properties.join(', ') + ' }');
+    }
+}
+
 function smdump_jsvalue(Addr) {
+    // XXX: There's an issue when passing a Int64 via the command;
+    // It thinks it's signed for some reason and the bitwiseShiftRight doesn't
+    // do a proper right shift.
     if(Addr == undefined) {
         logln('!smdump_jsvalue <jsvalue object addr>');
         return;
+    }
+
+    if(Addr.hasOwnProperty('address')) {
+        Addr = Addr.address;
     }
 
     const dumps = {
