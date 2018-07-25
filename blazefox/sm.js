@@ -3,7 +3,7 @@
 
 const logln = p => host.diagnostics.debugLog(p + '\n');
 const JSVAL_TAG_SHIFT = host.Int64(47);
-const JSVAL_PAYLOAD_MASK = host.Int64(1).bitwiseShiftLeft(JSVAL_TAG_SHIFT.add(1)).subtract(1);
+const JSVAL_PAYLOAD_MASK = host.Int64(1).bitwiseShiftLeft(JSVAL_TAG_SHIFT).subtract(1);
 const CLASS_NON_NATIVE = host.Int64(0x40000);
 const FLAG_DELEGATE = host.Int64(8);
 
@@ -93,7 +93,8 @@ function jsvalue_to_instance(Addr) {
         [JSVAL_TYPE_UNDEFINED] : __JSUndefined,
         [JSVAL_TYPE_BOOLEAN] : __JSBoolean,
         [JSVAL_TYPE_NULL] : __JSNull,
-        [JSVAL_TYPE_OBJECT] : __JSObject
+        [JSVAL_TYPE_OBJECT] : __JSObject,
+        [JSVAL_TYPE_SYMBOL] : __JSSymbol
     };
 
     if(!Types.hasOwnProperty(JSValue.Tag)) {
@@ -263,6 +264,21 @@ class __JSFunction {
 
     toString() {
         return this._Name;
+    }
+}
+
+class __JSSymbol {
+    constructor(Addr) {
+        this._Obj = host.createPointerObject(
+            Addr,
+            'js.exe',
+            'JS::Symbol*'
+        );
+    }
+
+    toString() {
+        const Desc = new __JSString(this._Obj.description_.address);
+        return 'Symbol(' + Desc + ')';
     }
 }
 
@@ -454,11 +470,11 @@ function smdump_jsboolean(Addr) {
 
 function smdump_jssymbol(Addr) {
     const Logger = function (Content) {
-        logln(Addr.toString(16) + ': JSVAL_TYPE_SYMBOL: ' + Content);
+        logln(Addr.toString(16) + ': js!js::SymbolObject: ' + Content);
     };
 
-    // XXX: TODO!
-    Logger(':(');
+    const JSSymbol = new __JSSymbol(Addr);
+    Logger(JSSymbol);
 }
 
 function smdump_jsdouble(Addr) {
