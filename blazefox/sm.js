@@ -470,7 +470,7 @@ function smdump_jsboolean(Addr) {
 
 function smdump_jssymbol(Addr) {
     const Logger = function (Content) {
-        logln(Addr.toString(16) + ': js!js::SymbolObject: ' + Content);
+        logln(Addr.toString(16) + ': js!js::Symbol: ' + Content);
     };
 
     const JSSymbol = new __JSSymbol(Addr);
