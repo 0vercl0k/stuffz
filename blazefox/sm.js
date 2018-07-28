@@ -400,6 +400,14 @@ class __JSObject {
             return new __JSArray(this._Addr).toString();
         }
 
+        if(this._ClassName == 'Map') {
+            return '{ ..Map.. }';
+        }
+
+        if(this._ClassName == 'ArrayBuffer') {
+            return 'ArrayBuffer(..)';
+        }
+
         if(this._Properties != undefined && this._Properties.length > 0) {
             return '{' + this._Properties.join(', ') + '}';
         }
@@ -494,6 +502,33 @@ function smdump_jsnull(Addr) {
     Logger('null');
 }
 
+function smdump_jsmap(Addr) {
+    const Logger = function (Content) {
+        logln(Addr.toString(16) + ': js!js::MapObject: ' + Content);
+    };
+
+    // XXX: TODO
+    Logger('its a map!');
+}
+
+function smdump_jsarraybuffer(Addr) {
+    const Logger = function (Content) {
+        logln(Addr.toString(16) + ': js!js::ArrayBufferObject: ' + Content);
+    };
+
+    // XXX: TODO
+    Logger('its an ArrayBuffer!');
+}
+
+function smdump_jstypedarray(Addr, Type) {
+    const Logger = function (Content) {
+        logln(Addr.toString(16) + ': js!js::TypedArrayObject: ' + Content);
+    };
+
+    // XXX: TODO
+    Logger('its an TypedArrayObject<' + Type + '>!');
+}
+
 function smdump_jsobject(Addr) {
     const Logger = function (Content) {
         logln(Addr.toString(16) + ': js!JSObject: ' + Content);
@@ -510,6 +545,12 @@ function smdump_jsobject(Addr) {
         smdump_jsfunction(Addr);
     } else if(ClassName == 'Array') {
         smdump_jsarray(Addr);
+    } else if(ClassName == 'ArrayBuffer') {
+        smdump_jsarraybuffer(Addr);
+    } else if(ClassName == 'Uint32Array') {
+        smdump_jstypedarray(Addr, 'u32');
+    } else if(ClassName == 'Map') {
+        smdump_jsmap(Addr);
     } else {
         Logger(' { ' + JSObject.Properties.join(', ') + ' }');
     }
