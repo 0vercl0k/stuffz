@@ -272,7 +272,7 @@ class __JSSymbol {
         this._Obj = host.createPointerObject(
             Addr,
             'js.exe',
-            'JS::Symbol*'
+            'js::Symbol*'
         );
     }
 
