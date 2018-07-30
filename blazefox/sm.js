@@ -282,6 +282,169 @@ class __JSSymbol {
     }
 }
 
+class __JSArrayBuffer {
+    constructor(Addr) {
+        this._Obj = host.createPointerObject(
+            Addr,
+            'js.exe',
+            'js::ArrayBufferObject*'
+        );
+
+        const ArrayBufferObjectSize = host.getModuleType('js.exe', 'js::ArrayBufferObject').size;
+        // static const uint8_t DATA_SLOT = 0;
+        // static const uint8_t BYTE_LENGTH_SLOT = 1;
+        const ByteLengthSlotAddr = Addr.add(ArrayBufferObjectSize).add(1 * 8);
+        const ByteLengthSlot = read_u64(ByteLengthSlotAddr);
+        this._ByteLength = new __JSInt32(ByteLengthSlot)._Value;
+        // static const uint8_t FIRST_VIEW_SLOT = 2;
+        // static const uint8_t FLAGS_SLOT = 3;
+        const FlagsAddr = Addr.add(ArrayBufferObjectSize).add(3 * 8);
+        const FlagsSlot = read_u64(FlagsAddr);
+        this._Flags = new __JSInt32(FlagsSlot)._Value;
+    }
+
+    get Flags() {
+        //  enum BufferKind {
+        //      PLAIN               = 0, // malloced or inline data
+        //      WASM                = 1,
+        //      MAPPED              = 2,
+        //      EXTERNAL            = 3,
+        //      KIND_MASK           = 0x3
+        //  };
+        // enum ArrayBufferFlags {
+        //     // The flags also store the BufferKind
+        //     BUFFER_KIND_MASK    = BufferKind::KIND_MASK,
+        //     DETACHED            = 0x4,
+        //     // The dataPointer() is owned by this buffer and should be released
+        //     // when no longer in use. Releasing the pointer may be done by freeing,
+        //     // invoking a dereference callback function, or unmapping, as
+        //     // determined by the buffer's other flags.
+        //     //
+        //     // Array buffers which do not own their data include buffers that
+        //     // allocate their data inline, and buffers that are created lazily for
+        //     // typed objects with inline storage, in which case the buffer points
+        //     // directly to the typed object's storage.
+        //     OWNS_DATA           = 0x8,
+        //     // This array buffer was created lazily for a typed object with inline
+        //     // data. This implies both that the typed object owns the buffer's data
+        //     // and that the list of views sharing this buffer's data might be
+        //     // incomplete. Any missing views will be typed objects.
+        //     FOR_INLINE_TYPED_OBJECT = 0x10,
+        //     // Views of this buffer might include typed objects.
+        //     TYPED_OBJECT_VIEWS  = 0x20,
+        //     // This PLAIN or WASM buffer has been prepared for asm.js and cannot
+        //     // henceforth be transferred/detached.
+        //     FOR_ASMJS           = 0x40
+        // };
+        const BufferKinds = {
+            0 : 'PLAIN',
+            1 : 'WASM',
+            2 : 'MAPPED',
+            3 : 'EXTERNAL'
+        };
+
+        const BufferKind = BufferKinds[this._Flags.bitwiseAnd(3).asNumber()];
+        const ArrayBufferFlags = [
+            'BufferKind(' + BufferKind + ')'
+        ];
+
+        if(this._Flags.bitwiseAnd(4).compareTo(0) != 0) {
+            ArrayBufferFlags.push('DETACHED');
+        }
+
+        if(this._Flags.bitwiseAnd(8).compareTo(0) != 0) {
+            ArrayBufferFlags.push('OWNS_DATA');
+        }
+
+        if(this._Flags.bitwiseAnd(0x10).compareTo(0) != 0) {
+            ArrayBufferFlags.push('FOR_INLINE_TYPED_OBJECT');
+        }
+
+        if(this._Flags.bitwiseAnd(0x20).compareTo(0) != 0) {
+            ArrayBufferFlags.push('TYPED_OBJECT_VIEWS');
+        }
+
+        if(this._Flags.bitwiseAnd(0x40).compareTo(0) != 0) {
+            ArrayBufferFlags.push('FOR_ASMJS');
+        }
+
+        return ArrayBufferFlags.join(' | ');
+    }
+
+    get ByteLength() {
+        return this._ByteLength;
+    }
+
+    toString() {
+        return 'ArrayBuffer({ByteLength:' + this._ByteLength + ', ...})';
+    }
+}
+
+class __JSTypedArray {
+    constructor(Addr) {
+        this._Obj = host.createPointerObject(
+            Addr,
+            'js.exe',
+            'js::TypedArrayObject*'
+        );
+
+        const Group = this._Obj.group_.value;
+        this._TypeName = host.memory.readString(Group.clasp_.name)
+        const Sizes = {
+            'Float64Array' : 8,
+            'Float32Array' : 4,
+            'Uint32Array' : 4,
+            'Int32Aray' : 4,
+            'Uint16Array' : 2,
+            'Int16Array' : 2,
+            'Uint8Array' : 1,
+            'Uint8ClampedArray' : 1,
+            'Int8Array' : 1
+        };
+        this._ElementSize = Sizes[this._TypeName];
+
+        const TypedArrayObjectSize = host.getModuleType('js.exe', 'js::TypedArrayObject').size;
+        // static const size_t BUFFER_SLOT = 0;
+        // static const size_t LENGTH_SLOT = 1;
+        const LengthSlotAddr = Addr.add(TypedArrayObjectSize).add(1 * 8);
+        const LengthSlot = read_u64(LengthSlotAddr);
+        this._Length = new __JSInt32(LengthSlot)._Value;
+        this._ByteLength = this._Length * this._ElementSize;
+        // static const size_t BYTEOFFSET_SLOT = 2;
+        const ByteOffsetSlotAddr = Addr.add(TypedArrayObjectSize).add(2 * 8);
+        const ByteOffsetSlot = read_u64(ByteOffsetSlotAddr);
+        this._ByteOffset = new __JSInt32(ByteOffsetSlot)._Value;
+        // static const size_t RESERVED_SLOTS = 3;
+    }
+
+    get Type() {
+        return this._TypeName;
+    }
+
+    get ByteOffset() {
+        return this._ByteOffset;
+    }
+
+    get ByteLength() {
+        return this._ByteLength;
+    }
+
+    get Length() {
+        return this._Length;
+    }
+
+    toString() {
+        return this._TypeName + '({Length:' + this._Length + ', ...})';
+    }
+}
+
+class __JSMap {
+    // XXX: TODO
+    toString() {
+        return 'new Map(...)';
+    }
+}
+
 class __JSObject {
     /* JSObject.h
      * A JavaScript object.
@@ -396,16 +559,23 @@ class __JSObject {
     }
 
     toString() {
-        if(this._ClassName == 'Array') {
-            return new __JSArray(this._Addr).toString();
-        }
+        const Builders = {
+            'Array' : __JSArray,
+            'Map' : __JSMap,
+            'ArrayBuffer' : __JSArrayBuffer,
+            'Float64Array' : __JSTypedArray,
+            'Float32Array' : __JSTypedArray,
+            'Uint32Array' : __JSTypedArray,
+            'Int32Array' : __JSTypedArray,
+            'Uint16Array' : __JSTypedArray,
+            'Int16Array' : __JSTypedArray,
+            'Uint8Array' : __JSTypedArray,
+            'Uint8ClampedArray' : __JSTypedArray,
+            'Int8Array' : __JSTypedArray
+        };
 
-        if(this._ClassName == 'Map') {
-            return '{ ..Map.. }';
-        }
-
-        if(this._ClassName == 'ArrayBuffer') {
-            return 'ArrayBuffer(..)';
+        if(Builders.hasOwnProperty(this._ClassName)) {
+            return new Builders[this._ClassName](this._Addr).toString();
         }
 
         if(this._Properties != undefined && this._Properties.length > 0) {
@@ -507,8 +677,8 @@ function smdump_jsmap(Addr) {
         logln(Addr.toString(16) + ': js!js::MapObject: ' + Content);
     };
 
-    // XXX: TODO
-    Logger('its a map!');
+    const JSMap = new __JSMap(Addr);
+    Logger('Content: ' + JSMap);
 }
 
 function smdump_jsarraybuffer(Addr) {
@@ -516,17 +686,23 @@ function smdump_jsarraybuffer(Addr) {
         logln(Addr.toString(16) + ': js!js::ArrayBufferObject: ' + Content);
     };
 
-    // XXX: TODO
-    Logger('its an ArrayBuffer!');
+    const JSArrayBuffer = new __JSArrayBuffer(Addr);
+    Logger('ByteLength: ' + JSArrayBuffer.ByteLength);
+    Logger('     Flags: ' + JSArrayBuffer.Flags);
+    Logger('   Content: ' + JSArrayBuffer);
 }
 
-function smdump_jstypedarray(Addr, Type) {
+function smdump_jstypedarray(Addr) {
     const Logger = function (Content) {
         logln(Addr.toString(16) + ': js!js::TypedArrayObject: ' + Content);
     };
 
-    // XXX: TODO
-    Logger('its an TypedArrayObject<' + Type + '>!');
+    const JSTypedArray = new __JSTypedArray(Addr);
+    Logger('      Type: ' + JSTypedArray.Type);
+    Logger('    Length: ' + JSTypedArray.Length);
+    Logger('ByteLength: ' + JSTypedArray.ByteLength);
+    Logger('ByteOffset: ' + JSTypedArray.ByteOffset);
+    Logger('   Content: ' + JSTypedArray);
 }
 
 function smdump_jsobject(Addr) {
@@ -541,16 +717,25 @@ function smdump_jsobject(Addr) {
     const JSObject = new __JSObject(Addr);
     const ClassName = JSObject.ClassName;
 
-    if(ClassName == 'Function') {
-        smdump_jsfunction(Addr);
-    } else if(ClassName == 'Array') {
-        smdump_jsarray(Addr);
-    } else if(ClassName == 'ArrayBuffer') {
-        smdump_jsarraybuffer(Addr);
-    } else if(ClassName == 'Uint32Array') {
-        smdump_jstypedarray(Addr, 'u32');
-    } else if(ClassName == 'Map') {
-        smdump_jsmap(Addr);
+    const Dumpers = {
+        'Function' : smdump_jsfunction,
+        'Array' : smdump_jsarray,
+        'ArrayBuffer' : smdump_jsarraybuffer,
+        'Map' : smdump_jsmap,
+
+        'Float64Array' : smdump_jstypedarray,
+        'Float32Array' : smdump_jstypedarray,
+        'Uint32Array' : smdump_jstypedarray,
+        'Int32Array' : smdump_jstypedarray,
+        'Uint16Array' : smdump_jstypedarray,
+        'Int16Array' : smdump_jstypedarray,
+        'Uint8Array' : smdump_jstypedarray,
+        'Uint8ClampedArray' : smdump_jstypedarray,
+        'Int8Array' : smdump_jstypedarray
+    };
+
+    if(Dumpers.hasOwnProperty(ClassName)) {
+        Dumpers[ClassName](Addr);
     } else {
         Logger(' { ' + JSObject.Properties.join(', ') + ' }');
     }
