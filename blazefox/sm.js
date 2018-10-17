@@ -31,6 +31,30 @@ const JSID_TYPE_SYMBOL = host.Int64(0x4);
 const SLOT_MASK = host.Int64(0xffffff);
 const FIXED_SLOTS_SHIFT = host.Int64(27);
 
+const FunctionConstants = {
+    0x0001 : 'INTERPRETED',
+    0x0004 : 'EXTENDED',
+    0x0008 : 'BOUND_FUN',
+    0x0010 : 'WASM_OPTIMIZED',
+    0x0020 : 'HAS_GUESSED_ATOM/HAS_BOUND_FUNCTION_NAME_PREFIX',
+    0x0040 : 'LAMBDA',
+    0x0080 : 'SELF_HOSTED',
+    0x0100 : 'HAS_INFERRED_NAME',
+    0x0200 : 'INTERPRETED_LAZY',
+    0x0400 : 'RESOLVED_LENGTH',
+    0x0800 : 'RESOLVED_NAME',
+};
+
+const FunctionKindConstants = {
+    0 : 'NORMAL_KIND',
+    1 : 'ARROW_KIND',
+    2 : 'METHOD_KIND',
+    3 : 'CLASSCONSTRUCTOR_KIND',
+    4 : 'GETTER_KIND',
+    5 : 'SETTER_KIND',
+    6 : 'ASMJS_KIND'
+};
+
 function read_u64(addr) {
     return host.memory.readMemoryValues(addr, 1, 8)[0];
 }
@@ -256,14 +280,28 @@ class __JSFunction {
         this._Atom = this._Obj.atom_.value.address;
         this._Name = '<anonymous>';
         if(this._Atom.compareTo(0) != 0) {
-            this._Name = new __JSString(this._Atom).toString();
+            this._Name = new __JSString(this._Atom).toString().slice(1, -1);
         }
 
         this._Name += '()';
+        this._Flags = this._Obj.flags_;
     }
 
     toString() {
         return this._Name;
+    }
+
+    get Flags() {
+        const S = [];
+        for(const Key in FunctionConstants) {
+            if(this._Flags.bitwiseAnd(host.parseInt64(Key)).compareTo(0) != 0) {
+                S.push(FunctionConstants[Key]);
+            }
+        }
+
+        const Kind = (this._Flags >> 13) & 7;
+        S.push(FunctionKindConstants[Kind]);
+        return S.join(' | ');
     }
 }
 
@@ -348,24 +386,18 @@ class __JSArrayBuffer {
             'BufferKind(' + BufferKind + ')'
         ];
 
-        if(this._Flags.bitwiseAnd(4).compareTo(0) != 0) {
-            ArrayBufferFlags.push('DETACHED');
-        }
+        const ArrayBufferFlagsConstants = {
+            [0x4] : 'DETACHED',
+            [0x8] : 'OWNS_DATA',
+            [0x10] : 'FOR_INLINE_TYPED_OBJECT',
+            [0x20] : 'TYPED_OBJECT_VIEWS',
+            [0x40] : 'FOR_ASMJS'
+        };
 
-        if(this._Flags.bitwiseAnd(8).compareTo(0) != 0) {
-            ArrayBufferFlags.push('OWNS_DATA');
-        }
-
-        if(this._Flags.bitwiseAnd(0x10).compareTo(0) != 0) {
-            ArrayBufferFlags.push('FOR_INLINE_TYPED_OBJECT');
-        }
-
-        if(this._Flags.bitwiseAnd(0x20).compareTo(0) != 0) {
-            ArrayBufferFlags.push('TYPED_OBJECT_VIEWS');
-        }
-
-        if(this._Flags.bitwiseAnd(0x40).compareTo(0) != 0) {
-            ArrayBufferFlags.push('FOR_ASMJS');
+        for(const Key in ArrayBufferFlagsConstants) {
+            if(this._Flags.bitwiseAnd(host.parseInt64(Key)).compareTo(0) != 0) {
+                ArrayBufferFlags.push(ArrayBufferFlagsConstants[Key]);
+            }
         }
 
         return ArrayBufferFlags.join(' | ');
@@ -606,6 +638,7 @@ function smdump_jsfunction(Addr) {
 
     const JSFunction = new __JSFunction(Addr);
     Logger(JSFunction);
+    Logger('Flags: ' + JSFunction.Flags);
 }
 
 function smdump_jsarray(Addr) {
