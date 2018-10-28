@@ -1,5 +1,8 @@
 ﻿// Axel '0vercl0k' Souchet - 24-June-2018
+// Math.atan2(['short', Symbol('hello'), new Map([[ 1, 'one' ],[ 2, 'two' ]]), ['loooooooooooooooooooooooooooooong', [0x1337, {doare:'in d4 place'}]], false], true)
 'use strict';
+
+let Module = null;
 
 const logln = p => host.diagnostics.debugLog(p + '\n');
 const JSVAL_TAG_SHIFT = host.Int64(47);
@@ -19,8 +22,8 @@ const JSVAL_TYPE_PRIVATE_GCTHING = host.Int64(0x1fff8);
 const JSVAL_TYPE_BIGINT = host.Int64(0x1fff9);
 const JSVAL_TYPE_OBJECT = host.Int64(0x1fffc);
 
-const INLINE_CHARS_BIT = host.Int64(1 << 3);
-const LATIN1_CHARS_BIT = host.Int64(1 << 6);
+const INLINE_CHARS_BIT = host.Int64(1 << 6);
+const LATIN1_CHARS_BIT = host.Int64(1 << 9);
 
 const JSID_TYPE_MASK = host.Int64(0x7);
 const JSID_TYPE_STRING = host.Int64(0x0);
@@ -29,7 +32,7 @@ const JSID_TYPE_VOID = host.Int64(0x2);
 const JSID_TYPE_SYMBOL = host.Int64(0x4);
 
 const SLOT_MASK = host.Int64(0xffffff);
-const FIXED_SLOTS_SHIFT = host.Int64(27);
+const FIXED_SLOTS_SHIFT = host.Int64(24);
 
 const FunctionConstants = {
     0x0001 : 'INTERPRETED',
@@ -55,27 +58,53 @@ const FunctionKindConstants = {
     6 : 'ASMJS_KIND'
 };
 
-function read_u64(addr) {
-    return host.memory.readMemoryValues(addr, 1, 8)[0];
+const Tag2Names = {
+    [JSVAL_TYPE_INT32] : 'Int32',
+    [JSVAL_TYPE_STRING] : 'String',
+    [JSVAL_TYPE_UNDEFINED] : 'Undefined',
+    [JSVAL_TYPE_BOOLEAN] : 'Boolean',
+    [JSVAL_TYPE_NULL] : 'Null',
+    [JSVAL_TYPE_OBJECT] : 'Object',
+    [JSVAL_TYPE_SYMBOL] : 'Symbol',
+};
+
+//
+// Read a uint64_t integer from Addr.
+//
+
+function read_u64(Addr) {
+    return host.memory.readMemoryValues(Addr, 1, 8)[0];
 }
+
+//
+// Mirror the functionality of ::fromElements.
+//
 
 function heapslot_to_objectelements(Addr) {
     // static ObjectElements* fromElements(HeapSlot* elems) {
     //  return reinterpret_cast<ObjectElements*>(uintptr_t(elems) - sizeof(ObjectElements));
     // }
-    const ObjectElementsSize = host.getModuleType('js.exe', 'js::ObjectElements').size;
+    const ObjectElementsSize = host.getModuleType(Module, 'js::ObjectElements').size;
     const ObjectElements = host.createPointerObject(
         Addr.subtract(ObjectElementsSize),
-        'js.exe',
+        Module,
         'js::ObjectElements*'
     );
 
     return ObjectElements;
 }
 
+//
+// Is Byte printable?
+//
+
 function printable(Byte) {
     return Byte >= 0x20 && Byte <= 0x7e;
 }
+
+//
+// Return a string describing Byte; either a \x41 or its ascii representation
+//
 
 function byte_to_str(Byte) {
     if(printable(Byte)) {
@@ -85,15 +114,28 @@ function byte_to_str(Byte) {
     return '\\x' + Byte.toString(16).padStart(2, '0');
 }
 
+//
+// Is this jsid an integer?
+//
+
 function jsid_is_int(Propid) {
     const Bits = Propid.value.asBits;
     return Bits.bitwiseAnd(JSID_TYPE_MASK).compareTo(JSID_TYPE_INT) == 0;
 }
 
+//
+// Is this jsid a string?
+//
+
 function jsid_is_string(Propid) {
     const Bits = Propid.value.asBits;
     return Bits.bitwiseAnd(JSID_TYPE_MASK).compareTo(JSID_TYPE_STRING) == 0;
 }
+
+//
+// Retrieve a property from a Shape; returns an actual integer/string based
+// on the propid_.
+//
 
 function get_property_from_shape(Shape) {
     // XXX: expose a smdump_jsid
@@ -118,7 +160,8 @@ function jsvalue_to_instance(Addr) {
         [JSVAL_TYPE_BOOLEAN] : __JSBoolean,
         [JSVAL_TYPE_NULL] : __JSNull,
         [JSVAL_TYPE_OBJECT] : __JSObject,
-        [JSVAL_TYPE_SYMBOL] : __JSSymbol
+        [JSVAL_TYPE_SYMBOL] : __JSSymbol,
+        [JSVAL_TYPE_MAGIC] : __JSMagic,
     };
 
     if(!Types.hasOwnProperty(JSValue.Tag)) {
@@ -129,35 +172,95 @@ function jsvalue_to_instance(Addr) {
     return new Type(JSValue.Payload);
 }
 
+class __JSMagic {
+    constructor(Addr) {
+        this._Addr = Addr;
+    }
+
+    toString() {
+        return 'magic';
+    }
+
+    Logger(Content) {
+        logln(this._Addr.toString(16) + ': JSVAL_TYPE_MAGIC: ' + Content);
+    }
+
+    Display() {
+        this.Logger(this);
+    }
+}
+
 class __JSNull {
+    constructor(Addr) {
+        this._Addr = Addr;
+    }
+
     toString() {
         return 'null';
+    }
+
+    Logger(Content) {
+        logln(this._Addr.toString(16) + ': JSVAL_TYPE_NULL: ' + Content);
+    }
+
+    Display() {
+        this.Logger(this);
     }
 }
 
 class __JSUndefined {
+    constructor(Addr) {
+        this._Addr = Addr;
+    }
+
     toString() {
         return 'undefined';
+    }
+
+    Logger(Content) {
+        logln(this.Addr.toString(16) + ': JSVAL_TYPE_UNDEFINED: ' + Content);
+    }
+
+    Display() {
+        this.Logger(this);
     }
 }
 
 class __JSBoolean {
     constructor(Addr) {
+        this._Addr = Addr;
         this._Value = Addr.compareTo(1) == 0 ? true : false;
     }
 
     toString() {
         return this._Value.toString();
     }
+
+    Logger(Content) {
+        logln(this._Addr.toString(16) + ': JSVAL_TYPE_BOOLEAN: ' + Content);
+    }
+
+    Display() {
+        this.Logger(this);
+    }
 }
 
 class __JSInt32 {
     constructor(Addr) {
+        this._Addr = Addr;
         this._Value = Addr.bitwiseAnd(0xffffffff);
     }
 
     toString() {
         return '0x' + this._Value.toString(16);
+    }
+
+    Logger(Content) {
+        logln(this._Addr.toString(16) + ': JSVAL_TYPE_INT32: ' + Content);
+    }
+
+    Display() {
+        this.Logger(this);
     }
 }
 
@@ -165,7 +268,7 @@ class __JSString {
     constructor(Addr) {
         this._Obj = host.createPointerObject(
             Addr,
-            'js.exe',
+            Module,
             'JSString*'
         );
         /*
@@ -178,7 +281,7 @@ class __JSString {
          * left and right nodes are Latin1. Flattening will result in a Latin1
          * string in this case.
          */
-        const Flags = this._Obj.d.u1.flags;
+        const Flags = this._Obj.d.flags_;
         const IsLatin1 = Flags.bitwiseAnd(LATIN1_CHARS_BIT).compareTo(0) != 0;
         const IsInline = Flags.bitwiseAnd(INLINE_CHARS_BIT).compareTo(0) != 0;
         let Address = null;
@@ -199,7 +302,7 @@ class __JSString {
             Address = this._Obj.d.s.u2.nonInlineCharsLatin1.address;
         }
 
-        let Length = this._Obj.d.u1.length;
+        let Length = Flags.bitwiseShiftRight(32);
         if(!IsLatin1) {
             Length *= 2;
         }
@@ -215,6 +318,14 @@ class __JSString {
 
     toString() {
         return "'" + this._String + "'";
+    }
+
+    Logger(Content) {
+        logln(this._Obj.address.toString(16) + ': js!JSString: ' + Content);
+    }
+
+    Display() {
+        this.Logger(this);
     }
 }
 
@@ -238,7 +349,7 @@ class __JSArray {
     constructor(Addr) {
         this._Obj = host.createPointerObject(
             Addr,
-            'js.exe',
+            Module,
             'js::ArrayObject*'
         );
         // XXX: why doesn't it work?
@@ -267,13 +378,23 @@ class __JSArray {
         }
         return '[' + Content.join(', ') + (this.Length > Max ? ', ...' : '') + ']';
     }
+
+    Logger(Content) {
+        logln(this._Obj.address.toString(16) + ': js!js::ArrayObject: ' + Content);
+    }
+
+    Display() {
+        this.Logger('  Length: ' + this.Length);
+        this.Logger('Capacity: ' + this.Capacity);
+        this.Logger(' Content: ' + this);
+    }
 }
 
 class __JSFunction {
     constructor(Addr) {
         this._Obj = host.createPointerObject(
             Addr,
-            'js.exe',
+            Module,
             'JSFunction*'
         );
 
@@ -303,13 +424,22 @@ class __JSFunction {
         S.push(FunctionKindConstants[Kind]);
         return S.join(' | ');
     }
+
+    Logger(Content) {
+        logln(this._Obj.address.toString(16) + ': js!JSFunction: ' + Content);
+    }
+
+    Display() {
+        this.Logger(this);
+        this.Logger('Flags: ' + this.Flags);
+    }
 }
 
 class __JSSymbol {
     constructor(Addr) {
         this._Obj = host.createPointerObject(
             Addr,
-            'js.exe',
+            Module,
             'js::Symbol*'
         );
     }
@@ -318,17 +448,25 @@ class __JSSymbol {
         const Desc = new __JSString(this._Obj.description_.address);
         return 'Symbol(' + Desc + ')';
     }
+
+    Logger(Content) {
+        logln(this.Obj_.address.toString(16) + ': js!js::Symbol: ' + Content);
+    }
+
+    Display() {
+        this.Logger(this);
+    }
 }
 
 class __JSArrayBuffer {
     constructor(Addr) {
         this._Obj = host.createPointerObject(
             Addr,
-            'js.exe',
+            Module,
             'js::ArrayBufferObject*'
         );
 
-        const ArrayBufferObjectSize = host.getModuleType('js.exe', 'js::ArrayBufferObject').size;
+        const ArrayBufferObjectSize = host.getModuleType(Module, 'js::ArrayBufferObject').size;
         // static const uint8_t DATA_SLOT = 0;
         // static const uint8_t BYTE_LENGTH_SLOT = 1;
         const ByteLengthSlotAddr = Addr.add(ArrayBufferObjectSize).add(1 * 8);
@@ -410,13 +548,23 @@ class __JSArrayBuffer {
     toString() {
         return 'ArrayBuffer({ByteLength:' + this._ByteLength + ', ...})';
     }
+
+    Logger(Content) {
+        logln(this._Obj.address.toString(16) + ': js!js::ArrayBufferObject: ' + Content);
+    }
+
+    Display() {
+        this.Logger('ByteLength: ' + this.ByteLength);
+        this.Logger('     Flags: ' + this.Flags);
+        this.Logger('   Content: ' + this);
+    }
 }
 
 class __JSTypedArray {
     constructor(Addr) {
         this._Obj = host.createPointerObject(
             Addr,
-            'js.exe',
+            Module,
             'js::TypedArrayObject*'
         );
 
@@ -435,7 +583,7 @@ class __JSTypedArray {
         };
         this._ElementSize = Sizes[this._TypeName];
 
-        const TypedArrayObjectSize = host.getModuleType('js.exe', 'js::TypedArrayObject').size;
+        const TypedArrayObjectSize = host.getModuleType(Module, 'js::TypedArrayObject').size;
         // static const size_t BUFFER_SLOT = 0;
         // static const size_t LENGTH_SLOT = 1;
         const LengthSlotAddr = Addr.add(TypedArrayObjectSize).add(1 * 8);
@@ -468,14 +616,60 @@ class __JSTypedArray {
     toString() {
         return this._TypeName + '({Length:' + this._Length + ', ...})';
     }
+
+    Logger(Content) {
+        logln(this._Obj.address.toString(16) + ': js!js::TypedArrayObject: ' + Content);
+    }
+
+    Display() {
+        this.Logger('      Type: ' + this.Type);
+        this.Logger('    Length: ' + this.Length);
+        this.Logger('ByteLength: ' + this.ByteLength);
+        this.Logger('ByteOffset: ' + this.ByteOffset);
+        this.Logger('   Content: ' + this);
+    }
 }
 
 class __JSMap {
+    constructor(Addr) {
+        this._Addr = Addr;
+    }
+
     // XXX: TODO
     toString() {
         return 'new Map(...)';
     }
+
+    Logger(Content) {
+        logln(this._Addr.toString(16) + ': js!js::MapObject: ' + Content);
+    }
+
+    Display() {
+        this.Logger('Content: ' + this);
+    }
 }
+
+const Names2Types = {
+    'Function' : __JSFunction,
+    'Array' : __JSArray,
+    'ArrayBuffer' : __JSArrayBuffer,
+    'Map' : __JSMap,
+    'Int32' : __JSInt32,
+    'String' : __JSString,
+    'Boolean' : __JSBoolean,
+    'Null' : __JSNull,
+    'Symbol' : __JSSymbol,
+
+    'Float64Array' : __JSTypedArray,
+    'Float32Array' : __JSTypedArray,
+    'Uint32Array' : __JSTypedArray,
+    'Int32Array' : __JSTypedArray,
+    'Uint16Array' : __JSTypedArray,
+    'Int16Array' : __JSTypedArray,
+    'Uint8Array' : __JSTypedArray,
+    'Uint8ClampedArray' : __JSTypedArray,
+    'Int8Array' : __JSTypedArray
+};
 
 class __JSObject {
     /* JSObject.h
@@ -508,7 +702,7 @@ class __JSObject {
         this._Addr = Addr;
         this._Obj = host.createPointerObject(
             this._Addr,
-            'js.exe',
+            Module,
             'JSObject*'
         );
 
@@ -522,11 +716,11 @@ class __JSObject {
 
         const Shape = host.createPointerObject(
             this._Obj.shapeOrExpando_.address,
-            'js.exe',
+            Module,
             'js::Shape*'
         );
 
-        const NativeObject = host.createPointerObject(Addr, 'js.exe', 'js::NativeObject*');
+        const NativeObject = host.createPointerObject(Addr, Module, 'js::NativeObject*');
 
         if(this._ClassName == 'Array') {
 
@@ -547,20 +741,19 @@ class __JSObject {
         const Properties = {};
         let CurrentShape = Shape;
         while(CurrentShape.parent.value.address.compareTo(0) != 0) {
-            const SlotIdx = CurrentShape.slotInfo.bitwiseAnd(SLOT_MASK).asNumber();
+            const SlotIdx = CurrentShape.immutableFlags.bitwiseAnd(SLOT_MASK).asNumber();
             Properties[SlotIdx] = get_property_from_shape(CurrentShape);
             CurrentShape = CurrentShape.parent.value;
         }
-
 
         //
         // Walk the slots to get the values now (check NativeGetPropertyInline/GetExistingProperty)
         //
 
-        const NativeObjectTypeSize = host.getModuleType('js.exe', 'js::NativeObject').size;
+        const NativeObjectTypeSize = host.getModuleType(Module, 'js::NativeObject').size;
         const NativeObjectElements = NativeObject.address.add(NativeObjectTypeSize);
         const NativeObjectSlots = NativeObject.slots_.address;
-        const Max = Shape.slotInfo.bitwiseShiftRight(FIXED_SLOTS_SHIFT).asNumber();
+        const Max = Shape.immutableFlags.bitwiseShiftRight(FIXED_SLOTS_SHIFT).asNumber();
         for(let Idx = 0; Idx < Object.keys(Properties).length; Idx++) {
 
             //
@@ -591,23 +784,8 @@ class __JSObject {
     }
 
     toString() {
-        const Builders = {
-            'Array' : __JSArray,
-            'Map' : __JSMap,
-            'ArrayBuffer' : __JSArrayBuffer,
-            'Float64Array' : __JSTypedArray,
-            'Float32Array' : __JSTypedArray,
-            'Uint32Array' : __JSTypedArray,
-            'Int32Array' : __JSTypedArray,
-            'Uint16Array' : __JSTypedArray,
-            'Int16Array' : __JSTypedArray,
-            'Uint8Array' : __JSTypedArray,
-            'Uint8ClampedArray' : __JSTypedArray,
-            'Int8Array' : __JSTypedArray
-        };
-
-        if(Builders.hasOwnProperty(this._ClassName)) {
-            return new Builders[this._ClassName](this._Addr).toString();
+        if(Names2Types.hasOwnProperty(this._ClassName)) {
+            return new Names2Types[this._ClassName](this._Addr).toString();
         }
 
         if(this._Properties != undefined && this._Properties.length > 0) {
@@ -622,72 +800,6 @@ class __JSObject {
     }
 }
 
-function smdump_jsint32(Addr) {
-    const Logger = function (Content) {
-        logln(Addr.toString(16) + ': JSVAL_TYPE_INT32: ' + Content);
-    };
-
-    const JSInt32 = new __JSInt32(Addr);
-    Logger(JSInt32);
-}
-
-function smdump_jsfunction(Addr) {
-    const Logger = function (Content) {
-        logln(Addr.toString(16) + ': js!JSFunction: ' + Content);
-    };
-
-    const JSFunction = new __JSFunction(Addr);
-    Logger(JSFunction);
-    Logger('Flags: ' + JSFunction.Flags);
-}
-
-function smdump_jsarray(Addr) {
-    const Logger = function (Content) {
-        logln(Addr.toString(16) + ': js!js::ArrayObject: ' + Content);
-    };
-
-    const JSArray = new __JSArray(Addr);
-    Logger('  Length: ' + JSArray.Length);
-    Logger('Capacity: ' + JSArray.Capacity);
-    Logger(' Content: ' + JSArray);
-}
-
-function smdump_jsstring(Addr) {
-    const Logger = function (Content) {
-        logln(Addr.toString(16) + ': js!JSString: ' + Content);
-    };
-
-    const JSString = new __JSString(Addr);
-    Logger(JSString);
-}
-
-function smdump_jsundefined(Addr) {
-    const Logger = function (Content) {
-        logln(Addr.toString(16) + ': JSVAL_TYPE_UNDEFINED: ' + Content);
-    };
-
-    const Undefined = new __JSUndefined(Addr);
-    Logger(Undefined);
-}
-
-function smdump_jsboolean(Addr) {
-    const Logger = function (Content) {
-        logln(Addr.toString(16) + ': JSVAL_TYPE_BOOLEAN: ' + Content);
-    };
-
-    const JSBoolean = new __JSBoolean(Addr);
-    Logger(JSBoolean);
-}
-
-function smdump_jssymbol(Addr) {
-    const Logger = function (Content) {
-        logln(Addr.toString(16) + ': js!js::Symbol: ' + Content);
-    };
-
-    const JSSymbol = new __JSSymbol(Addr);
-    Logger(JSSymbol);
-}
-
 function smdump_jsdouble(Addr) {
     const Logger = function (Content) {
         logln(Addr.toString(16) + ': JSVAL_TYPE_DOUBLE: ' + Content);
@@ -697,48 +809,9 @@ function smdump_jsdouble(Addr) {
     Logger(':(');
 }
 
-function smdump_jsnull(Addr) {
-    const Logger = function (Content) {
-        logln(Addr.toString(16) + ': JSVAL_TYPE_NULL: ' + Content);
-    };
+function smdump_jsobject(Addr, Type = null) {
+    Init();
 
-    Logger('null');
-}
-
-function smdump_jsmap(Addr) {
-    const Logger = function (Content) {
-        logln(Addr.toString(16) + ': js!js::MapObject: ' + Content);
-    };
-
-    const JSMap = new __JSMap(Addr);
-    Logger('Content: ' + JSMap);
-}
-
-function smdump_jsarraybuffer(Addr) {
-    const Logger = function (Content) {
-        logln(Addr.toString(16) + ': js!js::ArrayBufferObject: ' + Content);
-    };
-
-    const JSArrayBuffer = new __JSArrayBuffer(Addr);
-    Logger('ByteLength: ' + JSArrayBuffer.ByteLength);
-    Logger('     Flags: ' + JSArrayBuffer.Flags);
-    Logger('   Content: ' + JSArrayBuffer);
-}
-
-function smdump_jstypedarray(Addr) {
-    const Logger = function (Content) {
-        logln(Addr.toString(16) + ': js!js::TypedArrayObject: ' + Content);
-    };
-
-    const JSTypedArray = new __JSTypedArray(Addr);
-    Logger('      Type: ' + JSTypedArray.Type);
-    Logger('    Length: ' + JSTypedArray.Length);
-    Logger('ByteLength: ' + JSTypedArray.ByteLength);
-    Logger('ByteOffset: ' + JSTypedArray.ByteOffset);
-    Logger('   Content: ' + JSTypedArray);
-}
-
-function smdump_jsobject(Addr) {
     const Logger = function (Content) {
         logln(Addr.toString(16) + ': js!JSObject: ' + Content);
     };
@@ -747,59 +820,63 @@ function smdump_jsobject(Addr) {
         Addr = Addr.address;
     }
 
-    const JSObject = new __JSObject(Addr);
-    const ClassName = JSObject.ClassName;
-
-    const Dumpers = {
-        'Function' : smdump_jsfunction,
-        'Array' : smdump_jsarray,
-        'ArrayBuffer' : smdump_jsarraybuffer,
-        'Map' : smdump_jsmap,
-
-        'Float64Array' : smdump_jstypedarray,
-        'Float32Array' : smdump_jstypedarray,
-        'Uint32Array' : smdump_jstypedarray,
-        'Int32Array' : smdump_jstypedarray,
-        'Uint16Array' : smdump_jstypedarray,
-        'Int16Array' : smdump_jstypedarray,
-        'Uint8Array' : smdump_jstypedarray,
-        'Uint8ClampedArray' : smdump_jstypedarray,
-        'Int8Array' : smdump_jstypedarray
-    };
-
-    if(Dumpers.hasOwnProperty(ClassName)) {
-        Dumpers[ClassName](Addr);
+    let ClassName;
+    if(Type == 'Object' || Type == null) {
+        const JSObject = new __JSObject(Addr);
+        ClassName = JSObject.ClassName;
     } else {
-        Logger(' { ' + JSObject.Properties.join(', ') + ' }');
+        ClassName = Type;
     }
+
+    if(Names2Types.hasOwnProperty(ClassName)) {
+        const Inst = new Names2Types[ClassName](Addr);
+        Inst.Display();
+    }/* else {
+        Logger(' { ' + JSObject.Properties.join(', ') + ' }');
+    }*/
 }
 
 function smdump_jsvalue(Addr) {
-    // XXX: There's an issue when passing a Int64 via the command;
-    // It thinks it's signed for some reason and the bitwiseShiftRight doesn't
-    // do a proper right shift.
+    Init();
+
     if(Addr == undefined) {
         logln('!smdump_jsvalue <jsvalue object addr>');
         return;
     }
 
-    if(Addr.hasOwnProperty('address')) {
-        Addr = Addr.address;
+    //
+    // Ensure Addr is an unsigned value. If we don't do this
+    // the shift operations don't behave the way we want them to.
+    //
+
+    Addr = Addr.bitwiseAnd(host.parseInt64('0xffffffffffffffff'));
+    const JSValue = new __JSValue(Addr);
+    if(!Tag2Names.hasOwnProperty(JSValue.Tag)) {
+        logln('Tag ' +  JSValue.Tag.toString(16) + ' not recognized');
+        return;
     }
 
-    const dumps = {
-        [JSVAL_TYPE_INT32] : smdump_jsint32,
-        [JSVAL_TYPE_OBJECT] : smdump_jsobject,
-        [JSVAL_TYPE_STRING] : smdump_jsstring,
-        [JSVAL_TYPE_UNDEFINED] : smdump_jsundefined,
-        [JSVAL_TYPE_BOOLEAN] : smdump_jsboolean,
-        [JSVAL_TYPE_SYMBOL] : smdump_jssymbol,
-        [JSVAL_TYPE_DOUBLE] : smdump_jsdouble,
-        [JSVAL_TYPE_NULL] : smdump_jsnull
-    };
+    const Name = Tag2Names[JSValue.Tag];
+    // XXX: JSObject; retrieve the underlying type if possible
+    return smdump_jsobject(JSValue.Payload, Name);
+}
 
-    const JSValue = new __JSValue(Addr);
-    dumps[JSValue.Tag](JSValue.Payload);
+function Init() {
+    if(Module != null) {
+        return;
+    }
+
+    const Xul = host.currentProcess.Modules.Any(
+        p => p.Name.toLowerCase().endsWith('xul.dll')
+    );
+
+    if(Xul) {
+        Module = 'xul.dll';
+        logln('Detected xul.dll, using it as js module.');
+        return;
+    }
+
+    Module = 'js.exe';
 }
 
 function initializeScript() {
