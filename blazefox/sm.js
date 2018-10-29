@@ -59,6 +59,7 @@ const FunctionKindConstants = {
 };
 
 const Tag2Names = {
+    [JSVAL_TYPE_DOUBLE] : 'Double',
     [JSVAL_TYPE_INT32] : 'Int32',
     [JSVAL_TYPE_STRING] : 'String',
     [JSVAL_TYPE_UNDEFINED] : 'Undefined',
@@ -154,6 +155,7 @@ function get_property_from_shape(Shape) {
 function jsvalue_to_instance(Addr) {
     const JSValue = new __JSValue(Addr);
     const Types = {
+        [JSVAL_TYPE_DOUBLE] : __JSDouble,
         [JSVAL_TYPE_INT32] : __JSInt32,
         [JSVAL_TYPE_STRING] : __JSString,
         [JSVAL_TYPE_UNDEFINED] : __JSUndefined,
@@ -333,14 +335,23 @@ class __JSValue {
     constructor(Addr) {
         this._Addr = Addr;
         this._Tag = this._Addr.bitwiseShiftRight(JSVAL_TAG_SHIFT);
+        this._IsDouble = this._Tag.compareTo(JSVAL_TYPE_DOUBLE) < 0;
         this._Payload = this._Addr.bitwiseAnd(JSVAL_PAYLOAD_MASK);
     }
 
     get Payload() {
+        if(this._IsDouble) {
+            return this._Addr;
+        }
+
         return this._Payload;
     }
 
     get Tag() {
+        if(this._IsDouble) {
+            return JSVAL_TYPE_DOUBLE;
+        }
+
         return this._Tag;
     }
 }
@@ -649,6 +660,31 @@ class __JSMap {
     }
 }
 
+function i2f(L, H) {
+    const U32 = new Uint32Array([L, H]);
+    const F64 = new Float64Array(U32.buffer);
+    return F64[0];
+}
+
+class __JSDouble {
+    constructor(Addr) {
+        this._Addr = Addr;
+    }
+
+    toString() {
+        const D = i2f(this._Addr.getLowPart(), this._Addr.getHighPart());
+        return 'double(' + D + ')';
+    }
+
+    Logger(Content) {
+        logln(this._Addr.toString(16) + ': JSVAL_TYPE_DOUBLE: ' + Content);
+    }
+
+    Display() {
+        this.Logger('Content: ' + this);
+    }
+}
+
 const Names2Types = {
     'Function' : __JSFunction,
     'Array' : __JSArray,
@@ -659,6 +695,7 @@ const Names2Types = {
     'Boolean' : __JSBoolean,
     'Null' : __JSNull,
     'Symbol' : __JSSymbol,
+    'Double' : __JSDouble,
 
     'Float64Array' : __JSTypedArray,
     'Float32Array' : __JSTypedArray,
@@ -798,15 +835,6 @@ class __JSObject {
 
         return 'Dunno';
     }
-}
-
-function smdump_jsdouble(Addr) {
-    const Logger = function (Content) {
-        logln(Addr.toString(16) + ': JSVAL_TYPE_DOUBLE: ' + Content);
-    };
-
-    // XXX: TODO!
-    Logger(':(');
 }
 
 function smdump_jsobject(Addr, Type = null) {
