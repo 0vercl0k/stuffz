@@ -824,6 +824,9 @@ function smdump_jsobject(Addr, Type = null) {
     if(Type == 'Object' || Type == null) {
         const JSObject = new __JSObject(Addr);
         ClassName = JSObject.ClassName;
+        if(!Names2Types.hasOwnProperty(ClassName)) {
+            Logger(ClassName + ' = { ' + JSObject.Properties.join(', ') + ' }');
+        }
     } else {
         ClassName = Type;
     }
@@ -831,9 +834,7 @@ function smdump_jsobject(Addr, Type = null) {
     if(Names2Types.hasOwnProperty(ClassName)) {
         const Inst = new Names2Types[ClassName](Addr);
         Inst.Display();
-    }/* else {
-        Logger(' { ' + JSObject.Properties.join(', ') + ' }');
-    }*/
+    }
 }
 
 function smdump_jsvalue(Addr) {
@@ -857,7 +858,6 @@ function smdump_jsvalue(Addr) {
     }
 
     const Name = Tag2Names[JSValue.Tag];
-    // XXX: JSObject; retrieve the underlying type if possible
     return smdump_jsobject(JSValue.Payload, Name);
 }
 
