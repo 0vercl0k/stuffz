@@ -1,5 +1,20 @@
 ﻿// Axel '0vercl0k' Souchet - 24-June-2018
-// Math.atan2(['short', Symbol('hello'), new Map([[ 1, 'one' ],[ 2, 'two' ]]), ['loooooooooooooooooooooooooooooong', [0x1337, {doare:'in d4 place'}]], false], true)
+//
+// Example:
+//   * from the interpreter:
+//       Math.atan2(['short', 13.37, new Map([[ 1, 'one' ],[ 2, 'two' ]]), ['loooooooooooooooooooooooooooooong', [0x1337, {doare:'in d4 place'}]], false, null, undefined, true, Math.atan2, Math])
+//
+//   * from the debugger:
+//       js!js::math_atan2:
+//       00007ff6`0227e140 56              push    rsi
+//       0:000> !smdump_jsvalue vp[2].asBits_
+//       1e5f10024c0: js!js::ArrayObject:   Length: 10
+//       1e5f10024c0: js!js::ArrayObject: Capacity: 10
+//       1e5f10024c0: js!js::ArrayObject:  Content: ['short', 13.37, new Map(...), ['loooooooooooooooooooooooooooooong', [0x1337, {'doare' : 'in d4 place'}]], false, null, undefined, true, atan2(), Math]
+//       @$smdump_jsvalue(vp[2].asBits_)
+
+//
+
 'use strict';
 
 let Module = null;
@@ -18,8 +33,6 @@ const JSVAL_TYPE_NULL = host.Int64(0x1fff4);
 const JSVAL_TYPE_MAGIC = host.Int64(0x1fff5);
 const JSVAL_TYPE_STRING = host.Int64(0x1fff6);
 const JSVAL_TYPE_SYMBOL = host.Int64(0x1fff7);
-const JSVAL_TYPE_PRIVATE_GCTHING = host.Int64(0x1fff8);
-const JSVAL_TYPE_BIGINT = host.Int64(0x1fff9);
 const JSVAL_TYPE_OBJECT = host.Int64(0x1fffc);
 
 const INLINE_CHARS_BIT = host.Int64(1 << 6);
@@ -67,6 +80,7 @@ const Tag2Names = {
     [JSVAL_TYPE_NULL] : 'Null',
     [JSVAL_TYPE_OBJECT] : 'Object',
     [JSVAL_TYPE_SYMBOL] : 'Symbol',
+    [JSVAL_TYPE_MAGIC] : 'Magic',
 };
 
 //
@@ -154,23 +168,12 @@ function get_property_from_shape(Shape) {
 
 function jsvalue_to_instance(Addr) {
     const JSValue = new __JSValue(Addr);
-    const Types = {
-        [JSVAL_TYPE_DOUBLE] : __JSDouble,
-        [JSVAL_TYPE_INT32] : __JSInt32,
-        [JSVAL_TYPE_STRING] : __JSString,
-        [JSVAL_TYPE_UNDEFINED] : __JSUndefined,
-        [JSVAL_TYPE_BOOLEAN] : __JSBoolean,
-        [JSVAL_TYPE_NULL] : __JSNull,
-        [JSVAL_TYPE_OBJECT] : __JSObject,
-        [JSVAL_TYPE_SYMBOL] : __JSSymbol,
-        [JSVAL_TYPE_MAGIC] : __JSMagic,
-    };
-
-    if(!Types.hasOwnProperty(JSValue.Tag)) {
+    if(!Tag2Names.hasOwnProperty(JSValue.Tag)) {
         return 'Dunno';
     }
 
-    const Type = Types[JSValue.Tag];
+    const Name = Tag2Names[JSValue.Tag];
+    const Type = Names2Types[Name];
     return new Type(JSValue.Payload);
 }
 
@@ -380,13 +383,15 @@ class __JSArray {
     }
 
     toString() {
-        const Max = 5;
+        const Max = 10;
         const Content = [];
         for(let Idx = 0; Idx < Math.min(Max, this.Length); ++Idx) {
             const Addr = this._Content.add(Idx * 8);
             const JSValue = read_u64(Addr);
-            Content.push(jsvalue_to_instance(JSValue).toString());
+            const Inst = jsvalue_to_instance(JSValue);
+            Content.push(Inst.toString());
         }
+
         return '[' + Content.join(', ') + (this.Length > Max ? ', ...' : '') + ']';
     }
 
@@ -536,8 +541,8 @@ class __JSArrayBuffer {
         ];
 
         const ArrayBufferFlagsConstants = {
-            [0x4] : 'DETACHED',
-            [0x8] : 'OWNS_DATA',
+            [0x04] : 'DETACHED',
+            [0x08] : 'OWNS_DATA',
             [0x10] : 'FOR_INLINE_TYPED_OBJECT',
             [0x20] : 'TYPED_OBJECT_VIEWS',
             [0x40] : 'FOR_ASMJS'
@@ -660,20 +665,18 @@ class __JSMap {
     }
 }
 
-function i2f(L, H) {
-    const U32 = new Uint32Array([L, H]);
-    const F64 = new Float64Array(U32.buffer);
-    return F64[0];
-}
-
 class __JSDouble {
     constructor(Addr) {
         this._Addr = Addr;
     }
 
     toString() {
-        const D = i2f(this._Addr.getLowPart(), this._Addr.getHighPart());
-        return 'double(' + D + ')';
+        const U32 = new Uint32Array([
+            this._Addr.getLowPart(),
+            this._Addr.getHighPart()
+        ]);
+        const F64 = new Float64Array(U32.buffer);
+        return F64[0];
     }
 
     Logger(Content) {
@@ -681,7 +684,7 @@ class __JSDouble {
     }
 
     Display() {
-        this.Logger('Content: ' + this);
+        this.Logger(this);
     }
 }
 
@@ -694,6 +697,7 @@ const Names2Types = {
     'String' : __JSString,
     'Boolean' : __JSBoolean,
     'Null' : __JSNull,
+    'Undefined' : __JSUndefined,
     'Symbol' : __JSSymbol,
     'Double' : __JSDouble,
 
@@ -821,8 +825,13 @@ class __JSObject {
     }
 
     toString() {
-        if(Names2Types.hasOwnProperty(this._ClassName)) {
-            return new Names2Types[this._ClassName](this._Addr).toString();
+        if(this._ClassName != 'Object' && Names2Types.hasOwnProperty(this._ClassName)) {
+            const Type = Names2Types[this._ClassName];
+            return new Type(this._Addr).toString();
+        }
+
+        if(this._ClassName != 'Object') {
+            return this._ClassName;
         }
 
         if(this._Properties != undefined && this._Properties.length > 0) {
@@ -835,14 +844,30 @@ class __JSObject {
 
         return 'Dunno';
     }
+
+    Logger(Content) {
+        logln(this._Addr.toString(16) + ': js!JSObject: ' + Content);
+    }
+
+    Display() {
+        this.Logger('Content: ' + this);
+
+        //
+        // If the class name is not Object then it means the toString() method
+        // might already have displayed the properties.
+        // {foo:'bar'} VS Math.
+        //
+
+        if(this._ClassName != 'Object') {
+            this.Logger('Properties: {' + this._Properties.join(', ') + '}');
+        }
+    }
 }
+
+Names2Types['Object'] = __JSObject;
 
 function smdump_jsobject(Addr, Type = null) {
     Init();
-
-    const Logger = function (Content) {
-        logln(Addr.toString(16) + ': js!JSObject: ' + Content);
-    };
 
     if(Addr.hasOwnProperty('address')) {
         Addr = Addr.address;
@@ -853,7 +878,7 @@ function smdump_jsobject(Addr, Type = null) {
         const JSObject = new __JSObject(Addr);
         ClassName = JSObject.ClassName;
         if(!Names2Types.hasOwnProperty(ClassName)) {
-            Logger(ClassName + ' = { ' + JSObject.Properties.join(', ') + ' }');
+            JSObject.Display();
         }
     } else {
         ClassName = Type;
