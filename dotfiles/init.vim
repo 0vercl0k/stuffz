@@ -20,8 +20,6 @@ endif
 source $VIMRUNTIME/mswin.vim
 "" Allow to select text with the mouse
 set mouse=a
-"" Line numbers on the left side
-set number
 "" tab -> 4spaces
 set tabstop=4 shiftwidth=4 expandtab
 "" Solarized theme
@@ -29,6 +27,13 @@ set background=dark
 colorscheme solarized8
 "" py2 annaconda
 let g:python_host_prog = 'C:/ProgramData/Anaconda2/python.exe'
+"" Hybrid line numbers
+set number relativenumber
+augroup numbertoggle
+  autocmd!
+  autocmd BufEnter,FocusGained,InsertLeave * set relativenumber
+  autocmd BufLeave,FocusLost,InsertEnter   * set norelativenumber
+augroup END
 
 " Plugins
 "" NERDTree
