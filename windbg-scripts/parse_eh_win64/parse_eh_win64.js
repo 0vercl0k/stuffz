@@ -330,17 +330,9 @@ function BangEHHandlers() {
     let Registers = CurrentThread.Registers.User;
 
     let ReturnAddresses = [Registers.rip];
-    // Unfortunately, the return addresses are not available in the Frame
-    // model, so we rely on evaluating 'kp'.
-    let Frames = Control.ExecuteCommand('kp');
-    for (let Line of Frames) {
-        Line = Line.trim().split(' ', 3);
-        if (Line[0] == '#' || (Line[1] == '(Inline' && Line[2] == 'Function)')) {
-            continue;
-        }
-
-        let ReturnAddress = host.parseInt64(Line[2], 16);
-        ReturnAddresses.push(ReturnAddress);
+    let Frames = CurrentThread.Stack.Frames;
+    for (let Frame of Frames) {
+        ReturnAddresses.push(Frame.Attributes.ReturnOffset);
     }
 
     logln(ReturnAddresses.length + ' stack frames, scanning for handlers...');
