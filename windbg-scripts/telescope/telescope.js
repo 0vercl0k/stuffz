@@ -97,7 +97,7 @@ function FormatU32(Addr) {
 }
 
 //
-// Initializion / global stuff.
+// Initialization / global stuff.
 //
 
 let Initialized = false;
@@ -109,7 +109,7 @@ function HandleTTD() {
     const CurrentSession = host.currentSession;
 
     //
-    // Grabs addressable chunks.
+    // Grab addressable chunks.
     //
 
     const CurrentThread = host.currentThread;
@@ -129,7 +129,7 @@ function HandleTTD() {
     }
 
     //
-    // Grabs virtual allocated memory regions.
+    // Grab virtual allocated memory regions.
     //
 
     const VirtualAllocs = CurrentSession.TTD.Calls(
@@ -143,13 +143,13 @@ function HandleTTD() {
             VirtualAlloc.ReturnValue,
             VirtualAlloc.Parameters[1],
             'VirtualAlloced',
-            // XXX: figure out access
+            // XXX: parse access
             'rw-'
         ));
     }
 
     //
-    // Grabs mapped view regions.
+    // Grab mapped view regions.
     //
 
     const MapViewOfFiles = CurrentSession.TTD.Calls(
@@ -163,7 +163,7 @@ function HandleTTD() {
             MapViewOfFile.ReturnValue,
             0x1000,
             'MappedView',
-            // XXX: figure out access
+            // XXX: parse access
             'rw-'
         ));
     }
@@ -172,7 +172,7 @@ function HandleTTD() {
 function InitializeVASpace() {
 
     //
-    // Enumerates the modules.
+    // Enumerate the modules.
     //
 
     logln('Populating the VA space with modules..');
@@ -182,6 +182,7 @@ function InitializeVASpace() {
             Module.BaseAddress,
             Module.Size,
             'Image ' + Module.Name,
+            // XXX: Parse section headers for more granular page properties.
             'r-x'
         ));
     }
@@ -319,7 +320,7 @@ class _Region {
 function AddressToRegion(Addr) {
 
     //
-    // Maps the address space with VA regions.
+    // Map the address space with VA regions.
     //
 
     return VaSpace.find(
@@ -345,9 +346,6 @@ class _ChainEntry {
             this.Name = this.Name.substring(this.Name.lastIndexOf('\\') + 1);
         }
         this.Last = false;
-    }
-
-    toStringLast() {
     }
 
     Equals(Entry) {
