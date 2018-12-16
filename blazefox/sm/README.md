@@ -12,7 +12,7 @@ Run `.scriptload sm.js` to load the script. You can dump `js::Value` with `!smdu
 
 ## Examples
 
-* Dumping the `js::Value` object associated to the following JavaScript object `['short', 13.37, new Map([[ 1, 'one' ],[ 2, 'two' ]]), ['loooooooooooooooooooooooooooooong', [0x1337, {doare:'in d4 place'}]], false, null, undefined, true, Math.atan2, Math]`:
+* Dumping the `js::Value` associated to the following JavaScript object `['short', 13.37, new Map([[ 1, 'one' ],[ 2, 'two' ]]), ['loooooooooooooooooooooooooooooong', [0x1337, {doare:'in d4 place'}]], false, null, undefined, true, Math.atan2, Math]`:
 
 ```text
 0:000> !smdump_jsvalue vp[2].asBits_
