@@ -344,12 +344,20 @@ class _ChainEntry {
             this.Name = this.ValueRegion.Name;
             this.Name = this.Name.substring(this.Name.lastIndexOf('\\') + 1);
         }
+        this.Last = false;
     }
 
     toStringLast() {
-        let Value = null;
-        if(this.AddrRegion == undefined) {
-            return this.toString();
+    }
+
+    Equals(Entry) {
+        return this.Addr.compareTo(Entry.Addr) == 0;
+    }
+
+    toString() {
+        const S = FormatPtr(this.Value) + ' (' + this.Name + ')';
+        if(!this.Last || this.AddrRegion == undefined) {
+            return S;
         }
 
         if(this.AddrRegion.Executable) {
@@ -365,6 +373,7 @@ class _ChainEntry {
             const Ansi = ReadString(this.Addr);
             const IsPrintable = p => {
                 return p != null &&
+                    // XXX: ugly AF.
                     p.match(/^[a-z0-9!"#$%&'()*+,/\\.:;<=>?@\[\] ^_`{|}~-]+$/i) != null &&
                     p.length > 5
             };
@@ -384,15 +393,7 @@ class _ChainEntry {
         // output.
         //
 
-        return this.toString();
-    }
-
-    Equals(Entry) {
-        return this.Addr.compareTo(Entry.Addr) == 0;
-    }
-
-    toString() {
-        return FormatPtr(this.Value) + ' (' + this.Name + ')';
+        return S;
     }
 }
 
@@ -402,6 +403,15 @@ class _Chain {
         this.__HasCycle = false;
         this.__Addr = Addr;
         while(this.FollowPtr()) { };
+        this.__Length = this.__Entries.length;
+
+        //
+        // Tag the last entry as 'last'.
+        //
+
+        if(this.__Length >= 1) {
+            this.__Entries[this.__Length - 1].Last = true;
+        }
     }
 
     FollowPtr() {
@@ -451,34 +461,20 @@ class _Chain {
         }
 
         //
-        // Iterate over the chain. We'll special case the last
-        // entry.
+        // Iterate over the chain.
         //
 
-        const S = [];
-        const Size = this.__Entries.length;
-        if(Size >= 2) {
-            for(let Idx = 0; Idx < Size - 1; Idx++) {
-                const Entry = this.__Entries[Idx];
-                S.push(Entry.toString());
-            }
-        }
+        let S = this.__Entries.join(' -> ');
 
         //
-        // Special case the last entry:
-        //   - If the last entry is code, let's disassemble it.
-        //   - If the last entry is data, then try to check if it points on a string.
-        // You get the idea :-).
+        // Add a little something if we have a cycle so that the user knows.
         //
 
-        const Last = this.__Entries[Size - 1];
-        let LastStr = Last.toStringLast();
         if(this.__HasCycle) {
-            LastStr = LastStr.concat(' [...]');
+            S += ' [...]';
         }
 
-        S.push(LastStr);
-        return S.join(' -> ');
+        return S;
     }
 
     *[Symbol.iterator]() {
@@ -492,20 +488,14 @@ function CreateChain(Addr) {
     return new _Chain(Addr);
 }
 
-function Telescope(Addr, Range) {
+function Telescope(Addr) {
     if(Addr == undefined) {
         logln('!telescope <addr>');
         return;
     }
 
     const CurrentSession = host.currentSession;
-
-    //
-    // Handle the range argument.
-    //
-
-    // XXX: Uncomment below
-    const Lines = Range == undefined ? DefaultNumberOfLines : Range;
+    const Lines = DefaultNumberOfLines;
     const PointerSize = CurrentSession.Attributes.Machine.PointerSize;
     const FormatOffset = p => '0x' + p.toString(16).padStart(4, '0');
 
