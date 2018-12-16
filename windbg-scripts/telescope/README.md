@@ -1,8 +1,9 @@
 # telescope.js
 
-telescope.js is a [JavaScript](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/javascript-debugger-scripting) debugger extension  for WinDbg that mirrors the `dereference`/`telescope` command from [GEF](https://github.com/hugsy/gef). It works on crash-dumps, live debugging, and TTD traces.
+`telescope.js` is a [JavaScript](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/javascript-debugger-scripting) debugger extension  for WinDbg that mirrors the `dereference`/`telescope` command from [GEF](https://github.com/hugsy/gef). It works on crash-dumps, live debugging, and TTD traces.
 
 ## Usage
+
 Run `.scriptload telescope.js` to load the script. You can invoke the telescope feature with `!telescope <addr>` or programatically via `dx @$createchain(<addr>)`.
 
 ## Examples
