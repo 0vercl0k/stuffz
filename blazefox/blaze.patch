@@ -1,0 +1,88 @@
+diff -r ee6283795f41 js/src/builtin/Array.cpp
+--- a/js/src/builtin/Array.cpp	Sat Apr 07 00:55:15 2018 +0300
++++ b/js/src/builtin/Array.cpp	Sun Apr 08 00:01:23 2018 +0000
+@@ -192,6 +192,20 @@
+     return ToLength(cx, value, lengthp);
+ }
+ 
++static MOZ_ALWAYS_INLINE bool
++BlazeSetLengthProperty(JSContext* cx, HandleObject obj, uint64_t length)
++{
++    if (obj->is<ArrayObject>()) {
++        obj->as<ArrayObject>().setLengthInt32(length);
++        obj->as<ArrayObject>().setCapacityInt32(length);
++        obj->as<ArrayObject>().setInitializedLengthInt32(length);
++        return true;
++    }
++    return false;
++}
++
++
++
+ /*
+  * Determine if the id represents an array index.
+  *
+@@ -1578,6 +1592,23 @@
+     return DenseElementResult::Success;
+ }
+ 
++bool js::array_blaze(JSContext* cx, unsigned argc, Value* vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++    RootedObject obj(cx, ToObject(cx, args.thisv()));
++    if (!obj)
++        return false;
++
++    if (!BlazeSetLengthProperty(cx, obj, 420))
++        return false;
++
++    //uint64_t l = obj.as<ArrayObject>().setLength(cx, 420);
++
++    args.rval().setObject(*obj);
++    return true;
++}
++
++
+ // ES2017 draft rev 1b0184bc17fc09a8ddcf4aeec9b6d9fcac4eafce
+ // 22.1.3.21 Array.prototype.reverse ( )
+ bool
+@@ -3511,6 +3542,8 @@
+     JS_FN("unshift",            array_unshift,      1,0),
+     JS_FNINFO("splice",         array_splice,       &array_splice_info, 2,0),
+ 
++    JS_FN("blaze",            array_blaze,      0,0),
++
+     /* Pythonic sequence methods. */
+     JS_SELF_HOSTED_FN("concat",      "ArrayConcat",      1,0),
+     JS_INLINABLE_FN("slice",    array_slice,        2,0, ArraySlice),
+diff -r ee6283795f41 js/src/builtin/Array.h
+--- a/js/src/builtin/Array.h	Sat Apr 07 00:55:15 2018 +0300
++++ b/js/src/builtin/Array.h	Sun Apr 08 00:01:23 2018 +0000
+@@ -166,6 +166,9 @@
+ array_reverse(JSContext* cx, unsigned argc, js::Value* vp);
+ 
+ extern bool
++array_blaze(JSContext* cx, unsigned argc, js::Value* vp);
++
++extern bool
+ array_splice(JSContext* cx, unsigned argc, js::Value* vp);
+ 
+ extern const JSJitInfo array_splice_info;
+diff -r ee6283795f41 js/src/vm/ArrayObject.h
+--- a/js/src/vm/ArrayObject.h	Sat Apr 07 00:55:15 2018 +0300
++++ b/js/src/vm/ArrayObject.h	Sun Apr 08 00:01:23 2018 +0000
+@@ -60,6 +60,14 @@
+         getElementsHeader()->length = length;
+     }
+ 
++    void setCapacityInt32(uint32_t length) {
++        getElementsHeader()->capacity = length;
++    }
++
++    void setInitializedLengthInt32(uint32_t length) {
++        getElementsHeader()->initializedLength = length;
++    }
++
+     // Make an array object with the specified initial state.
+     static inline ArrayObject*
+     createArray(JSContext* cx,
