@@ -103,7 +103,7 @@ function FormatU32(Addr) {
 let Initialized = false;
 let ReadPtr = null;
 let FormatPtr = null;
-const VaSpace = [];
+let VaSpace = [];
 
 function HandleTTD() {
     const CurrentSession = host.currentSession;
@@ -112,6 +112,7 @@ function HandleTTD() {
     // Grab addressable chunks.
     //
 
+    logln('Populating the VA space with TTD.Data.Heap..');
     const CurrentThread = host.currentThread;
     const Position = CurrentThread.TTD.Position;
     const Chunks = CurrentSession.TTD.Data.Heap().Where(
@@ -132,6 +133,7 @@ function HandleTTD() {
     // Grab virtual allocated memory regions.
     //
 
+    logln('Populating the VA space with VirtualAllocated regions..');
     const VirtualAllocs = CurrentSession.TTD.Calls(
         'kernelbase!VirtualAlloc'
     ).Where(
@@ -152,6 +154,7 @@ function HandleTTD() {
     // Grab mapped view regions.
     //
 
+    logln('Populating the VA space with MappedViewOfFile regions..');
     const MapViewOfFiles = CurrentSession.TTD.Calls(
         'kernelbase!MapViewOfFile'
     ).Where(
@@ -169,7 +172,7 @@ function HandleTTD() {
     }
 }
 
-function InitializeVASpace() {
+function HandleUser() {
 
     //
     // Enumerate the modules.
@@ -232,15 +235,61 @@ function InitializeVASpace() {
         'Peb',
         'rw-'
     ));
+}
+
+function HandleKernel() {
 
     //
-    // If we have a TTD target, let's do some more work.
+    // Enumerate the kernel modules.
     //
 
+    logln('Populating the VA space with kernel modules..');
     const CurrentSession = host.currentSession;
-    const IsTTD = CurrentSession.Attributes.Target.IsTTDTarget
+    const SystemProcess = CurrentSession.Processes.First(
+        p => p.Name == 'System'
+    );
+
+    const MmUserProbeAddress = ReadPtr(
+        host.getModuleSymbolAddress("nt", "MmUserProbeAddress")
+    );
+
+    const KernelModules = SystemProcess.Modules.Where(
+        p => p.BaseAddress.compareTo(MmUserProbeAddress) > 0
+    );
+
+    for(const Module of KernelModules) {
+        VaSpace.push(new _Region(
+            Module.BaseAddress,
+            Module.Size,
+            'Image ' + Module.Name,
+            // XXX: Parse section headers for more granular page properties.
+            'r-x'
+        ));
+    }
+}
+
+function InitializeVASpace() {
+    const CurrentSession = host.currentSession;
+    const TargetAttributes = CurrentSession.Attributes.Target;
+    const IsTTD = TargetAttributes.IsTTDTarget;
+    const IsUser = TargetAttributes.IsUserTarget;
+    const IsKernel = TargetAttributes.IsKernelTarget && TargetAttributes.IsNTTarget;
+
+    if(IsUser) {
+        HandleUser();
+    }
+
     if(IsTTD) {
+
+        //
+        // If we have a TTD target, let's do some more work.
+        //
+
         HandleTTD();
+    }
+
+    if(IsKernel) {
+        HandleKernel();
     }
 }
 
@@ -256,12 +305,6 @@ function InitializeWrapper(Funct) {
             const PointerSize = CurrentSession.Attributes.Machine.PointerSize;
             ReadPtr = PointerSize.compareTo(8) == 0 ? ReadU64 : ReadU32;
             FormatPtr = PointerSize.compareTo(8) == 0 ? FormatU64 : FormatU32;
-
-            //
-            // Initialize the VA map.
-            //
-
-            InitializeVASpace();
 
             //
             // One time initialization!
@@ -433,7 +476,11 @@ class _Chain {
         //
 
         const Entry = new _ChainEntry(this.__Addr, Value);
-        if(this.__Entries.find(p => p.Equals(Entry))) {
+        const DoesEntryExist = this.__Entries.find(
+            p => p.Equals(Entry)
+        );
+
+        if(DoesEntryExist) {
 
             //
             // If we have seen this Entry before, it means there's a cycle
@@ -483,7 +530,16 @@ class _Chain {
 }
 
 function CreateChain(Addr) {
-    return new _Chain(Addr);
+
+    //
+    // Initialize the VA space.
+    //
+
+    InitializeVASpace();
+
+    const Chain = new _Chain(Addr);
+    VaSpace = [];
+    return Chain;
 }
 
 function Telescope(Addr) {
@@ -491,6 +547,12 @@ function Telescope(Addr) {
         logln('!telescope <addr>');
         return;
     }
+
+    //
+    // Initialize the VA space.
+    //
+
+    InitializeVASpace();
 
     const CurrentSession = host.currentSession;
     const Lines = DefaultNumberOfLines;
@@ -500,10 +562,12 @@ function Telescope(Addr) {
     for(let Idx = 0; Idx < Lines; Idx++) {
         const Offset = PointerSize.multiply(Idx);
         const CurAddr = Addr.add(Offset);
-        const Chain = CreateChain(CurAddr);
+        const Chain = new _Chain(CurAddr);
         const Header = FormatPtr(CurAddr) + '|+' + FormatOffset(Offset);
         logln(Header + ': ' + Chain.toString());
     }
+
+    VaSpace = [];
 }
 
 function initializeScript() {
