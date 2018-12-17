@@ -40,11 +40,31 @@ function ReadU32(Addr) {
     return Value;
 }
 
-function ReadString(Addr) {
+function ReadU16(Addr) {
+    let Value = null;
+    try {
+        Value = host.memory.readMemoryValues(
+            Addr, 1, 2
+        )[0];
+    } catch(e) {
+    }
+
+    return Value;
+}
+
+function ReadString(Addr, MaxLength) {
     let Value = null;
     try {
         Value = host.memory.readString(Addr);
     } catch(e) {
+    }
+
+    if(Value == null) {
+        return null;
+    }
+
+    if(Value.length > MaxLength) {
+        return Value.substr(0, MaxLength);
     }
 
     return Value;
@@ -96,6 +116,10 @@ function FormatU32(Addr) {
     return '0x' + Addr.toString(16).padStart(8, '0');
 }
 
+function BitSet(Value, Bit) {
+    return Value.bitwiseAnd(Bit).compareTo(0) != 0;
+}
+
 //
 // Initialization / global stuff.
 //
@@ -103,7 +127,97 @@ function FormatU32(Addr) {
 let Initialized = false;
 let ReadPtr = null;
 let FormatPtr = null;
+let IsTTD = false;
+let IsUser = false;
+let IsKernel = false;
 let VaSpace = [];
+
+function *SectionHeaders(BaseAddress) {
+    if(IsKernel && ReadU32(BaseAddress) == null) {
+
+        //
+        // If we can't read the module, it might mean it's a module
+        // in the session space and we can't read in this process context.
+        // XXX: fix this
+        //
+
+        return;
+    }
+        // 0:000> dt _IMAGE_DOS_HEADER e_lfanew
+    //   +0x03c e_lfanew : Int4B
+    const NtHeaders = BaseAddress.add(ReadU32(BaseAddress.add(0x3c)));
+    // 0:000> dt _IMAGE_NT_HEADERS64 FileHeader
+    //    +0x004 FileHeader : _IMAGE_FILE_HEADER
+    // 0:000> dt _IMAGE_FILE_HEADER NumberOfSections SizeOfOptionalHeader
+    //    +0x002 NumberOfSections : Uint2B
+    //    +0x010 SizeOfOptionalHeader : Uint2B
+    const NumberOfSections = ReadU16(NtHeaders.add(0x4 + 0x2));
+    const SizeOfOptionalHeader = ReadU16(NtHeaders.add(0x4 + 0x10));
+    // 0:000> dt _IMAGE_NT_HEADERS64 OptionalHeader
+    //   +0x018 OptionalHeader : _IMAGE_OPTIONAL_HEADER64
+    const OptionalHeader = NtHeaders.add(0x18);
+    const SectionHeaders = OptionalHeader.add(SizeOfOptionalHeader);
+    // 0:000> ?? sizeof(_IMAGE_SECTION_HEADER)
+    // unsigned int64 0x28
+    const SizeofSectionHeader = 0x28;
+    for(let Idx = 0; Idx < NumberOfSections; Idx++) {
+        const SectionHeader = SectionHeaders.add(
+            Idx.multiply(SizeofSectionHeader)
+        );
+        // 0:000> dt _IMAGE_SECTION_HEADER Name
+        //    +0x000 Name             : [8] UChar
+        const Name = ReadString(SectionHeader, 8);
+        // 0:000> dt _IMAGE_SECTION_HEADER VirtualAddress
+        //    +0x00c VirtualAddress : Uint4B
+        const Address = BaseAddress.add(
+            ReadU32(SectionHeader.add(0xc))
+        );
+        // 0:000> dt _IMAGE_SECTION_HEADER SizeOfRawData
+        //    +0x08 Misc : Uint4B
+        // XXX: Take care of alignment?
+        const VirtualSize = ReadU32(SectionHeader.add(0x08));
+        // 0:000> dt _IMAGE_SECTION_HEADER Characteristics
+        //    +0x024 Characteristics : Uint4B
+        const Characteristics = ReadU32(SectionHeader.add(0x24));
+        const Properties = [
+            '-',
+            '-',
+            '-'
+        ];
+
+        // The section can be read.
+        const IMAGE_SCN_MEM_READ = host.Int64(0x40000000);
+        if(BitSet(Characteristics, IMAGE_SCN_MEM_READ)) {
+            Properties[0] = 'r';
+        }
+
+        if(IsKernel) {
+            const IMAGE_SCN_MEM_DISCARDABLE = host.Int64(0x2000000);
+            if(BitSet(Characteristics, IMAGE_SCN_MEM_DISCARDABLE)) {
+                Properties[0] = '-';
+            }
+        }
+
+        // The section can be written to.
+        const IMAGE_SCN_MEM_WRITE = host.Int64(0x80000000);
+        if(Characteristics.bitwiseAnd(IMAGE_SCN_MEM_WRITE).compareTo(0) != 0) {
+            Properties[1] = 'w';
+        }
+
+        // The section can be executed as code.
+        const IMAGE_SCN_MEM_EXECUTE = host.Int64(0x20000000);
+        if(Characteristics.bitwiseAnd(IMAGE_SCN_MEM_EXECUTE).compareTo(0) != 0) {
+            Properties[2] = 'x';
+        }
+
+        yield new _Region(
+            Address,
+            VirtualSize,
+            Name,
+            Properties.join('')
+        );
+    }
+}
 
 function HandleTTD() {
     const CurrentSession = host.currentSession;
@@ -181,13 +295,20 @@ function HandleUser() {
     logln('Populating the VA space with modules..');
     const CurrentProcess = host.currentProcess;
     for(const Module of CurrentProcess.Modules) {
-        VaSpace.push(new _Region(
-            Module.BaseAddress,
-            Module.Size,
-            'Image ' + Module.Name,
-            // XXX: Parse section headers for more granular page properties.
-            'r-x'
-        ));
+
+        //
+        // Iterate over the section headers of the module.
+        //
+
+        for(const Section of SectionHeaders(Module.BaseAddress)) {
+
+            VaSpace.push(new _Region(
+                Section.BaseAddress,
+                Section.Size,
+                'Image ' + Module.Name + ' (' + Section.Name + ')',
+                Section.Properties
+            ));
+        }
     }
 
     //
@@ -258,23 +379,24 @@ function HandleKernel() {
     );
 
     for(const Module of KernelModules) {
-        VaSpace.push(new _Region(
-            Module.BaseAddress,
-            Module.Size,
-            'Image ' + Module.Name,
-            // XXX: Parse section headers for more granular page properties.
-            'r-x'
-        ));
+
+        //
+        // Iterate over the section headers of the module.
+        //
+
+        for(const Section of SectionHeaders(Module.BaseAddress)) {
+
+            VaSpace.push(new _Region(
+                Section.BaseAddress,
+                Section.Size,
+                'Driver ' + Module.Name + ' (' + Section.Name + ')',
+                Section.Properties
+            ));
+        }
     }
 }
 
 function InitializeVASpace() {
-    const CurrentSession = host.currentSession;
-    const TargetAttributes = CurrentSession.Attributes.Target;
-    const IsTTD = TargetAttributes.IsTTDTarget;
-    const IsUser = TargetAttributes.IsUserTarget;
-    const IsKernel = TargetAttributes.IsKernelTarget && TargetAttributes.IsNTTarget;
-
     if(IsUser) {
         HandleUser();
     }
@@ -305,6 +427,10 @@ function InitializeWrapper(Funct) {
             const PointerSize = CurrentSession.Attributes.Machine.PointerSize;
             ReadPtr = PointerSize.compareTo(8) == 0 ? ReadU64 : ReadU32;
             FormatPtr = PointerSize.compareTo(8) == 0 ? FormatU64 : FormatU32;
+            const TargetAttributes = CurrentSession.Attributes.Target;
+            IsTTD = TargetAttributes.IsTTDTarget;
+            IsUser = TargetAttributes.IsUserTarget;
+            IsKernel = TargetAttributes.IsKernelTarget;
 
             //
             // One time initialization!
@@ -332,15 +458,22 @@ class _Region {
         this.BaseAddress = BaseAddress;
         this.EndAddress = this.BaseAddress.add(Size);
         this.Size = Size;
+        this.Properties = Properties;
         this.Executable = false;
         this.Readable = false;
+        this.Writeable = false;
+        if(Properties.indexOf('r') != -1) {
+            this.Readable = true;
+        }
+
+        if(Properties.indexOf('w') != -1) {
+            this.Writeable = true;
+        }
+
         if(Properties.indexOf('x') != -1) {
             this.Executable = true;
         }
 
-        if(Properties.indexOf('r') != -1) {
-            this.Readable = true;
-        }
     }
 
     In(Addr) {
@@ -352,8 +485,8 @@ class _Region {
     toString() {
         const Prop = [
             this.Readable ? 'r' : '-',
-            '-',
-            this.Executable ? 'e' : '-'
+            this.Writeable ? 'w' : '-',
+            this.Executable ? 'x' : '-'
         ];
 
         return this.Name + ' ' + Prop.join('');
