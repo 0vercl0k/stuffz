@@ -143,7 +143,8 @@ function *SectionHeaders(BaseAddress) {
 
         return;
     }
-        // 0:000> dt _IMAGE_DOS_HEADER e_lfanew
+
+    // 0:000> dt _IMAGE_DOS_HEADER e_lfanew
     //   +0x03c e_lfanew : Int4B
     const NtHeaders = BaseAddress.add(ReadU32(BaseAddress.add(0x3c)));
     // 0:000> dt _IMAGE_NT_HEADERS64 FileHeader
