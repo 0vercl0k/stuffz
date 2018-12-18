@@ -57,9 +57,6 @@ function ReadString(Addr, MaxLength) {
     try {
         Value = host.memory.readString(Addr);
     } catch(e) {
-    }
-
-    if(Value == null) {
         return null;
     }
 
@@ -136,11 +133,11 @@ function *SectionHeaders(BaseAddress) {
     if(IsKernel && ReadU32(BaseAddress) == null) {
 
         //
-        // If we can't read the module, it might mean it's a module
-        // in the session space and we can't read in this process context.
-        // XXX: fix this
+        // If we can't read the module, then..bail :(.
+        // XXX: Fix this? Session space? Paged out?
         //
 
+        logln('Cannot read ' + BaseAddress.toString(16) + ', skipping.');
         return;
     }
 
@@ -302,7 +299,6 @@ function HandleUser() {
         //
 
         for(const Section of SectionHeaders(Module.BaseAddress)) {
-
             VaSpace.push(new _Region(
                 Section.BaseAddress,
                 Section.Size,
@@ -398,7 +394,6 @@ function HandleKernel() {
         //
 
         for(const Section of SectionHeaders(Module.BaseAddress)) {
-
             VaSpace.push(new _Region(
                 Section.BaseAddress,
                 Section.Size,
