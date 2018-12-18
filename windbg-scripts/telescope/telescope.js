@@ -310,6 +310,18 @@ function HandleUser() {
                 Section.Properties
             ));
         }
+
+        //
+        // Add a catch all in case a pointer points inside the PE but not
+        // inside any sections (example of this is the PE header).
+        //
+
+        VaSpace.push(new _Region(
+            Module.BaseAddress,
+            Module.Size,
+            'Image ' + Module.Name,
+            'r--'
+        ));
     }
 
     //
@@ -394,6 +406,18 @@ function HandleKernel() {
                 Section.Properties
             ));
         }
+
+        //
+        // Add a catch all in case a pointer points inside the PE but not
+        // inside any sections (example of this is the PE header).
+        //
+
+        VaSpace.push(new _Region(
+            Module.BaseAddress,
+            Module.Size,
+            'Driver ' + Module.Name,
+            'r--'
+        ));
     }
 }
 
@@ -500,9 +524,24 @@ function AddressToRegion(Addr) {
     // Map the address space with VA regions.
     //
 
-    return VaSpace.find(
+    const Hits = VaSpace.filter(
         p => p.In(Addr)
     );
+
+    //
+    // Now, let's get the most precise region information by ordering
+    // the hits by size.
+    //
+
+    const OrderedHits = Hits.sort(
+        p => p.Size
+    );
+
+    //
+    // Return the most precise information we have!
+    //
+
+    return OrderedHits[0];
 }
 
 class _ChainEntry {
