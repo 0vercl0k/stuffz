@@ -384,7 +384,7 @@ function HandleKernel() {
     );
 
     const MmUserProbeAddress = ReadPtr(
-        host.getModuleSymbolAddress("nt", "MmUserProbeAddress")
+        host.getModuleSymbolAddress('nt', 'MmUserProbeAddress')
     );
 
     const KernelModules = SystemProcess.Modules.Where(
