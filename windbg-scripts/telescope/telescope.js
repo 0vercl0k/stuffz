@@ -91,9 +91,13 @@ function Disassemble(Addr) {
 
         //
         // Clean up the assembly.
+        // Turn the below:
+        //   'mov     rbx,qword ptr [00007FF8D3525660h] ; test    rbx,rbx ; je     00007FF8D34FC2EB'
+        // Into:
+        //   'mov rbx,qword ptr [00007FF8D3525660h] ; test rbx,rbx ; je 00007FF8D34FC2EB'
         //
 
-        p => p.toString().replace(/  /g, '')
+        p => p.toString().replace(/[ ]+/g, ' ')
     ).join(' ; ');
 }
 
