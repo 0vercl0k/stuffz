@@ -12,6 +12,9 @@ const logln = p => host.diagnostics.debugLog(p + '\n');
 // This is the number of lines the !telescope command displays.
 const DefaultNumberOfLines = 10;
 
+// This is the number of instructions to disassemble when a code pointer is encountered.
+const DefaultNumberOfInstructions = 3;
+
 //
 // Utility functions.
 //
@@ -78,31 +81,20 @@ function ReadWideString(Addr) {
 }
 
 function Disassemble(Addr) {
-    const Control = host.namespace.Debugger.Utility.Control;
-    const Lines = Array.from(Control.ExecuteCommand(
-        'u ' + Addr.toString(16) + ' l2')
-    );
+    const Code = host.namespace.Debugger.Utility.Code;
+    const Disassembler = Code.CreateDisassembler();
+    const Instrs = Array.from(Disassembler.DisassembleInstructions(Addr).Take(
+        DefaultNumberOfInstructions
+    ));
 
-    const Disass = [];
-    for(const Line of Lines) {
-
-        //
-        // Skip everything that doesn't start by an address.
-        //
-
-        if(Line.match(/^[0-9a-f`]+ /i) == null) {
-            continue;
-        }
+    return Instrs.map(
 
         //
-        // Extracts what follows the address.
+        // Clean up the assembly.
         //
 
-        const Match = Line.match(/^[0-9a-f`]+ [0-9a-f]+ [ ]+(.+)$/i);
-        Disass.push(Match[1]);
-    }
-
-    return Disass.join(' ; ');
+        p => p.toString().replace(/  /g, '')
+    ).join(' ; ');
 }
 
 function FormatU64(Addr) {
