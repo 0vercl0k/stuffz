@@ -1,0 +1,65 @@
+@import url("https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.5/css/materialize.min.css");
+@import url("https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.2/themes/smoothness/jquery-ui.css");
+
+/* http://materializecss.com/color.html */
+.container {
+    max-width: 90%;
+    width: 100%;
+    padding: 15px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+/* Properties for every chunks */
+.col {
+    border: 1px solid black;
+    margin: 1px;
+    text-align: center;
+    line-height: 50px;
+    font-size: 28px;
+    color: black;
+    padding: 2px;
+    line-height: 10px;
+}
+
+/* Color for the busy chunks */
+.col.busy {
+    background-color: #ef5350;
+}
+/* Color for the free chunks */
+.col.free {
+    background-color: #b2ff59;
+}
+
+/*                                                    */
+/* Configure the layout of the content of every chunk */
+/*                                                    */
+
+/* Share the same font for both the address/hexdump part */
+.address, .hexdump, b {
+    font-family: Consolas;
+}
+
+/* Different size of fonts though */
+.address {
+    font-size: 12px;
+}
+
+.hexdump {
+    font-size: 9px;
+}
+
+hr {
+    height: 1px;
+    margin: 3px;
+    border-width: 0;
+    background-color: black;
+}
+
+/* https://ihatetomatoes.net/greensock-timelinelite-tutorial/ */
+#controls {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 310px;
+    transform: translate(-50%, 120px);
+}

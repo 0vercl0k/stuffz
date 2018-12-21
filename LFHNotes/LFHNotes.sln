@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.30723.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HEAP_SUBSEGMENT", "HEAP_SUBSEGMENT\HEAP_SUBSEGMENT.vcxproj", "{28BFB398-EDD0-402B-98F1-6EE2A7A31B9E}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LFHViewer", "LFHViewer\LFHViewer.vcxproj", "{3BE23E70-5772-4DD6-AAE7-872C769D325D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{28BFB398-EDD0-402B-98F1-6EE2A7A31B9E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{28BFB398-EDD0-402B-98F1-6EE2A7A31B9E}.Debug|Win32.Build.0 = Debug|Win32
+		{28BFB398-EDD0-402B-98F1-6EE2A7A31B9E}.Release|Win32.ActiveCfg = Release|Win32
+		{28BFB398-EDD0-402B-98F1-6EE2A7A31B9E}.Release|Win32.Build.0 = Release|Win32
+		{3BE23E70-5772-4DD6-AAE7-872C769D325D}.Debug|Win32.ActiveCfg = Debug|Win32
+		{3BE23E70-5772-4DD6-AAE7-872C769D325D}.Debug|Win32.Build.0 = Debug|Win32
+		{3BE23E70-5772-4DD6-AAE7-872C769D325D}.Release|Win32.ActiveCfg = Release|Win32
+		{3BE23E70-5772-4DD6-AAE7-872C769D325D}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

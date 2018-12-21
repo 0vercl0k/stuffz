@@ -1,0 +1,7 @@
+decrypt_stub.obj
+
+kernel32.dll
+user32.dll
+gdi32.dll
+winspool.dll
+comdlg32.dll
