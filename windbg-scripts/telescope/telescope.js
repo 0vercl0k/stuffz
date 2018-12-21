@@ -82,7 +82,9 @@ function ReadWideString(Addr) {
 
 function Disassemble(Addr) {
     const Code = host.namespace.Debugger.Utility.Code;
-    const Disassembler = Code.CreateDisassembler();
+    const Disassembler = Code.CreateDisassembler(
+        PointerSize == 8 ? 'X64' : 'X86'
+    );
     const Instrs = Array.from(Disassembler.DisassembleInstructions(Addr).Take(
         DefaultNumberOfInstructions
     ));
@@ -119,6 +121,7 @@ function BitSet(Value, Bit) {
 
 let Initialized = false;
 let ReadPtr = null;
+let PointerSize = null;
 let FormatPtr = null;
 let IsTTD = false;
 let IsUser = false;
@@ -440,7 +443,7 @@ function InitializeWrapper(Funct) {
             // Initialize the ReadPtr function according to the PointerSize.
             //
 
-            const PointerSize = CurrentSession.Attributes.Machine.PointerSize;
+            PointerSize = CurrentSession.Attributes.Machine.PointerSize;
             ReadPtr = PointerSize.compareTo(8) == 0 ? ReadU64 : ReadU32;
             FormatPtr = PointerSize.compareTo(8) == 0 ? FormatU64 : FormatU32;
             const TargetAttributes = CurrentSession.Attributes.Target;

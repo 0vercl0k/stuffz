@@ -1,0 +1,21 @@
+// /Root/default avec wbemtest.exe
+[WMI,
+ Dynamic,
+ Provider("WmiProv"),
+ guid("{15D851F1-6539-1337-A529-00A0C9062910}")]
+class WmiT4pz
+{	    
+	[key, read]
+		string InstanceName;
+    
+	[read]
+    boolean Active;
+	
+	[WmiDataId(1),
+     read, write]
+		sint8 nbMagic;
+	
+	 [Implemented,
+     WmiMethodId(1)]
+		void Setter([in] sint8 t);
+};

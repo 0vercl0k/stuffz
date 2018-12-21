@@ -1,0 +1,8 @@
+TARGETNAME = ph03nix
+TARGETPATH = obj
+TARGETTYPE = DRIVER
+
+INCLUDES   = %BUILD%\inc
+LIBS       = %BUILD%\lib
+
+SOURCES    = ph03nix.c

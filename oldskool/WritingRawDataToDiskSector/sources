@@ -1,0 +1,8 @@
+TARGETNAME = WritingRaw
+TARGETPATH = obj
+TARGETTYPE = DRIVER
+
+INCLUDES   = %BUILD%\inc
+LIBS       = %BUILD%\lib
+
+SOURCES    = fat16.c main.c

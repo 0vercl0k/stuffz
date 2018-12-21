@@ -1,0 +1,23 @@
+mov eax,FFFFFFFFh
+mov ebx,[eax]
+mov ecx,00000074h
+cmp ebx,ecx
+jne AAAAAAAAh
+inc eax
+mov ebx,[eax]
+mov ecx,00000061h
+cmp ebx,ecx
+jne AAAAAAAAh
+inc eax
+mov ebx,[eax]
+mov ecx,00000070h
+cmp ebx,ecx
+jne AAAAAAAAh
+inc eax
+mov ebx,[eax]
+mov ecx,0000007ah
+cmp ebx,ecx
+jne AAAAAAAAh
+invoke 7e3d058ah,00000000h,FFFFFFFFh,EEEEEEEEh,00000000h
+exit
+invoke 7e3d058ah,00000000h,FFFFFFFFh,EEEEEEEEh,00000000h

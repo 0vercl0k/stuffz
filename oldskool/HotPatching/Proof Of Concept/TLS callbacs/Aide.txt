@@ -1,0 +1,54 @@
+\  Mise en place du TLS directory pour le PoC TLS callback par 0vercl0k -[ http://0vercl0k.blogspot.com   \
+ ----------------------------------------------------------------------------------------------------------
+ 
+Espace utilisé : 
+
+00402068  00 00 00 00 00 00 00 00  ........
+00402070  00 00 00 00 00 00 00 00  ........
+00402078  00 00 00 00 00 00 00 00  ........
+00402080  00 00 00 00 00 00 00 00  ........
+
+1dword : 68204000
+2dword : 68204000
+3dword : 78204000
+4dword : 80204000
+5dword : 00000000
+6dword : 00000000
+
+Callback : 
+
+004012FC  /. 55             PUSH EBP
+004012FD  |. 89E5           MOV EBP,ESP
+004012FF  |. 83EC 18        SUB ESP,18
+00401302  |. C70424 0000000>MOV DWORD PTR SS:[ESP],0                 ; |
+00401309  |. E8 02060000    CALL <JMP.&KERNEL32.GetModuleHandleA>    ; \GetModuleHandleA
+0040130E  |. 83EC 04        SUB ESP,4
+00401311  |. 8945 FC        MOV DWORD PTR SS:[EBP-4],EAX             ; |
+00401314  |. 8B55 FC        MOV EDX,DWORD PTR SS:[EBP-4]             ; |
+00401317  |. 8B45 FC        MOV EAX,DWORD PTR SS:[EBP-4]             ; |
+0040131A  |. 0342 3C        ADD EAX,DWORD PTR DS:[EDX+3C]            ; |
+0040131D  |. 8945 F8        MOV DWORD PTR SS:[EBP-8],EAX             ; |
+00401320  |. 8B55 F8        MOV EDX,DWORD PTR SS:[EBP-8]             ; |
+00401323  |. 8B45 FC        MOV EAX,DWORD PTR SS:[EBP-4]             ; |
+00401326  |. 0342 28        ADD EAX,DWORD PTR DS:[EDX+28]            ; |
+00401329  |. 8945 F4        MOV DWORD PTR SS:[EBP-C],EAX             ; |
+0040132C  |. 8B45 F4        MOV EAX,DWORD PTR SS:[EBP-C]             ; |
+0040132F  |. 8038 CC        CMP BYTE PTR DS:[EAX],0CC                ; |
+00401332  |. 75 0C          JNZ SHORT PoC_-_TL.00401340              ; |
+00401334  |. C70424 0000000>MOV DWORD PTR SS:[ESP],0                 ; |
+0040133B  |. E8 C0050000    CALL <JMP.&KERNEL32.ExitProcess>         ; \ExitProcess
+00401340  |> C9             LEAVE
+00401341  \. C3             RETN
+
+
+
+
+Finalement :
+
+00402068  68 20 40 00 68 20 40 00
+00402070  78 20 40 00 80 20 40 00
+00402078  00 00 00 00 00 00 00 00
+00402080  FC 12 40 00 00 00 00 00
+
+Offset de la directory : 00002068
+Taille en héxa : 00000018

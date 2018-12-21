@@ -1,0 +1,75 @@
+					--[ Hydropon-1K par 0vercl0k, <Measure your x86 skillz> ]--
+					 -[       Gr34tz : Ivanlef0u, Deimos, Baboon            ]-
+   					   \___________________________________________________/
+   
+Hydropon-1K est un OS pour architecture x86 que j'ai développé et dans lequel j'ai inclus un challenge. Pour résoudre ce challenge vous devez
+posséder des notions en asm, architecture des OS et fonctionnement des processeurs Intel x86. Il s'agit d'exploiter un stack-based
+buffer-overflow dans un programme user-land "vérouillé" afin d'exécuter la fonction de validation.   
+Le stack-based-buffer-overflow si situe dans la fonction ci-dessous :
+
+[code]
+void funct(void)
+{
+	char tapz[20];
+	asm volatile
+	(
+		"movl $0x1337, %%eax\n"
+		"movl %0, %%ebx\n"
+		"int $0x89\n"		
+		"movl $0x137, %%eax\n"
+		"int $0x89\n"
+		:
+		: "g" (tapz), "g" (tapz)
+	);
+}
+[/code]
+
+L'int 0x89 est l'interruption permettant d'appeler des sycalls, le n° 0x1337 est le syscall qui permet de realiser une espece de scanf,
+il suffit de passer un pointeur sur le buffer, afin de rediriger toutes les touches tappés au clavier dans ce buffer, l'écriture ne s'arrête
+pas tant que de '\n' (touche entrée) n'a pas été appuyé ; d'ou le depacement de capacité.
+Le syscall 0x137 quant à lui permet tout simplement d'afficher la chaine final en rouge à l'écran.
+
+Le challenge se base que sur des protections mises en place par des mecanismes des processeurs de la famille x86 ; l'évasion de la protection
+doit être precise, en effet la protection ne peut être evade n'importe comment.
+
+Tout a été teste et mis en place pour que l'exploitation puisse se dérouler sans problème, donc ne vous posez pas de questions quant à cela.
+Il suffit d'avoir quelques idées en tête et de bien analyser les sources :).
+
+Afin d'éviter les élaborations de shellcode hasardeux, il vous suffit d'appeler la fonction suivante qui se trouve à l'adresse linéaire 0x50000000: 
+
+[code]
+void YOUWINFUCKINGMOFO(void)
+{
+	asm volatile
+	(
+		"movl $0x138, %eax\n"
+		"int $0x89\n"
+	);
+}
+[/code]
+
+Personnelement, je vous recommanderais l'utilisation _massive_ de l'interface de debug de bochs ; en effet il est possible de poser des breakpoints etc afin
+de suivre l'évolution au fil des instructions.
+Et n'oublier pas qu'IDA peut vous fournir un peu plus d'aide en matière de desassemblage (c'est pas le point fort de boch).
+
+J'aimerais maintenant attirez votre attention sur plusieurs points : 
+	-Tout d'abord afin de pouvoir utiliser le fichier de debug de bochs que je fournis, il vous suffit de changer la valeur suivante avec le path vers votre binaire bien sûr:
+		[dump]floppya: type=1_44, 1_44="C:\Hydropon-1K\binaires\Hydropon-1K.com", status=inserted[/dump]
+	-Pour pouvoir intéragir avec Hydropon-1K, vous utiliserez le clavier et j'ai réalise celui-ci sur mon portable ; autrement dit pavé numérique et autres ne seront pas gérés
+	-Toujours concernant le clavier, il ne faut pas utilisez la touche "AltGr" elle n'est pas géré dans l'os, vous utiliserez donc à la place ctrl+alt+touche
+	-N'oublier pas la documentation du debugeur de bochs :
+		[lien]http://bochs.sourceforge.net/doc/docbook/user/internal-debugger.html[/lien]
+		[lien]http://a.michelizza.free.fr/pmwiki.php?n=TutoOS.Debug[/lien]
+	-Les regles de pagination sont les suivantes :
+		[dump]
+			 info tab
+			cr3: 0x00020000
+			0x00000000-0x003fffff -> 0x00000000-0x003fffff
+			0x40000000-0x403fffff -> 0x00400000-0x007fffff
+			0x50000000-0x50000fff -> 0x00800000-0x00800fff
+		[/dump]
+	-L'espace userland commence en 0x40000000, et le code se situe en 0x40000a00
+	-N'oubliez pas que si vous utilisez IDA, le binaire contient en première partie du code 16bits, et en seconde du code 32bits.
+Je pense que vous avez toutes les clées en main pour valider l'epreuve ; h4v3 fun "wizz Measure your x86 sk1llz"
+Si vous avez des questions, n'hesitez pas à me mailer 0vercl0k[at]tuxfamily[dot]org.
+Cordialement 0vercl0k.

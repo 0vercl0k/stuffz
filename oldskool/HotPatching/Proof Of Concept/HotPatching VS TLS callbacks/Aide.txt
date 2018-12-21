@@ -1,0 +1,92 @@
+\  Mise en place du TLS directory pour le PoC HotPatching VS TLS callback par 0vercl0k -[ http://0vercl0k.blogspot.com   \
+ -------------------------------------------------------------------------------------------------------------------------
+ 
+Espace utilisé : 
+
+00402068  00 00 00 00 00 00 00 00  ........
+00402070  00 00 00 00 00 00 00 00  ........
+00402078  00 00 00 00 00 00 00 00  ........
+00402080  00 00 00 00 00 00 00 00  ........
+
+1dword : 68204000
+2dword : 68204000
+3dword : 78204000
+4dword : 80204000
+5dword : 00000000
+6dword : 00000000
+
+Callback : 
+
+0040139C  /. 55             PUSH EBP
+0040139D  |. 89E5           MOV EBP,ESP
+0040139F  |. 83EC 18        SUB ESP,18
+004013A2  |. C70424 7530400>MOV DWORD PTR SS:[ESP],PoC_-_Ho.00403075 ; |ASCII "ntdll.dll"
+004013A9  |. E8 F2060000    CALL <JMP.&KERNEL32.LoadLibraryA>        ; \LoadLibraryA
+004013AE  |. 83EC 04        SUB ESP,4
+004013B1  |. C74424 04 7F30>MOV DWORD PTR SS:[ESP+4],PoC_-_Ho.004030>; |ASCII "sprintf"
+004013B9  |. 890424         MOV DWORD PTR SS:[ESP],EAX               ; |
+004013BC  |. E8 EF060000    CALL <JMP.&KERNEL32.GetProcAddress>      ; \GetProcAddress
+004013C1  |. 83EC 08        SUB ESP,8
+004013C4  |. 8945 F8        MOV DWORD PTR SS:[EBP-8],EAX             ; |
+004013C7  |. 8B45 F8        MOV EAX,DWORD PTR SS:[EBP-8]             ; |
+004013CA  |. 83C0 02        ADD EAX,2                                ; |
+004013CD  |. A3 10404000    MOV DWORD PTR DS:[404010],EAX            ; |
+004013D2  |. 8D45 FC        LEA EAX,DWORD PTR SS:[EBP-4]             ; |
+004013D5  |. 894424 0C      MOV DWORD PTR SS:[ESP+C],EAX             ; |
+004013D9  |. C74424 08 0400>MOV DWORD PTR SS:[ESP+8],4               ; |
+004013E1  |. C74424 04 0200>MOV DWORD PTR SS:[ESP+4],2               ; |
+004013E9  |. 8B45 F8        MOV EAX,DWORD PTR SS:[EBP-8]             ; |
+004013EC  |. 890424         MOV DWORD PTR SS:[ESP],EAX               ; |
+004013EF  |. E8 CC060000    CALL <JMP.&KERNEL32.VirtualProtect>      ; \VirtualProtect
+004013F4  |. 83EC 10        SUB ESP,10
+004013F7  |. 8B45 F8        MOV EAX,DWORD PTR SS:[EBP-8]             ; |
+004013FA  |. 66:C700 EBF9   MOV WORD PTR DS:[EAX],0F9EB              ; |
+004013FF  |. 8D45 FC        LEA EAX,DWORD PTR SS:[EBP-4]             ; |
+00401402  |. 894424 0C      MOV DWORD PTR SS:[ESP+C],EAX             ; |
+00401406  |. 8B45 FC        MOV EAX,DWORD PTR SS:[EBP-4]             ; |
+00401409  |. 894424 08      MOV DWORD PTR SS:[ESP+8],EAX             ; |
+0040140D  |. C74424 04 0200>MOV DWORD PTR SS:[ESP+4],2               ; |
+00401415  |. 8B45 F8        MOV EAX,DWORD PTR SS:[EBP-8]             ; |
+00401418  |. 890424         MOV DWORD PTR SS:[ESP],EAX               ; |
+0040141B  |. E8 A0060000    CALL <JMP.&KERNEL32.VirtualProtect>      ; \VirtualProtect
+00401420  |. 83EC 10        SUB ESP,10
+00401423  |. 8D45 FC        LEA EAX,DWORD PTR SS:[EBP-4]             ; |
+00401426  |. 894424 0C      MOV DWORD PTR SS:[ESP+C],EAX             ; |
+0040142A  |. C74424 08 0400>MOV DWORD PTR SS:[ESP+8],4               ; |
+00401432  |. C74424 04 0500>MOV DWORD PTR SS:[ESP+4],5               ; |
+0040143A  |. 8B45 F8        MOV EAX,DWORD PTR SS:[EBP-8]             ; |
+0040143D  |. 83E8 05        SUB EAX,5                                ; |
+00401440  |. 890424         MOV DWORD PTR SS:[ESP],EAX               ; |
+00401443  |. E8 78060000    CALL <JMP.&KERNEL32.VirtualProtect>      ; \VirtualProtect
+00401448  |. 83EC 10        SUB ESP,10
+0040144B  |. C74424 08 0500>MOV DWORD PTR SS:[ESP+8],5               ; ||
+00401453  |. C74424 04 8730>MOV DWORD PTR SS:[ESP+4],PoC_-_Ho.004030>; ||
+0040145B  |. 8B45 F8        MOV EAX,DWORD PTR SS:[EBP-8]             ; ||
+0040145E  |. 83E8 05        SUB EAX,5                                ; ||
+00401461  |. 890424         MOV DWORD PTR SS:[ESP],EAX               ; ||
+00401464  |. E8 37000000    CALL <JMP.&ntdll.memcpy>                 ; |\memcpy
+00401469  |. 8D45 FC        LEA EAX,DWORD PTR SS:[EBP-4]             ; |
+0040146C  |. 894424 0C      MOV DWORD PTR SS:[ESP+C],EAX             ; |
+00401470  |. 8B45 FC        MOV EAX,DWORD PTR SS:[EBP-4]             ; |
+00401473  |. 894424 08      MOV DWORD PTR SS:[ESP+8],EAX             ; |
+00401477  |. C74424 04 0500>MOV DWORD PTR SS:[ESP+4],5               ; |
+0040147F  |. 8B45 F8        MOV EAX,DWORD PTR SS:[EBP-8]             ; |
+00401482  |. 83E8 05        SUB EAX,5                                ; |
+00401485  |. 890424         MOV DWORD PTR SS:[ESP],EAX               ; |
+00401488  |. E8 33060000    CALL <JMP.&KERNEL32.VirtualProtect>      ; \VirtualProtect
+0040148D  |. 83EC 10        SUB ESP,10
+00401490  |. C9             LEAVE
+00401491  \. C3             RETN
+
+
+
+Finalement :
+
+00402068  68 20 40 00 68 20 40 00  h @.h @.
+00402070  78 20 40 00 80 20 40 00  x @.€ @.
+00402078  00 00 00 00 00 00 00 00  ........
+00402080  9C 13 40 00 00 00 00 00  œ@.....
+
+
+Offset de la directory : 00002068
+Taille en héxa : 00000018

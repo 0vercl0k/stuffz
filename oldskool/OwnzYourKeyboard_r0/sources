@@ -1,0 +1,10 @@
+TARGETNAME = attach
+TARGETPATH = obj
+TARGETTYPE = DRIVER
+
+INCLUDES   = %BUILD%\inc
+LIBS       = %BUILD%\lib
+
+SOURCES    = attach.c
+
+

@@ -1,0 +1,62 @@
+[Version]
+Signature   = "$Windows NT$"
+Class       = "ActivityMonitor"
+DriverVer   = 13/03/2008,1.3.3.7
+
+[DefaultInstall]
+CopyFiles  = @C4lim3r0.sys
+
+[DefaultInstall.Services]
+AddService  = C4lim3r0,,C4lim3r0.Service
+
+[DefaultUninstall]
+DelFiles   = C4lim3r0.DriverFiles
+DelReg     = C4lim3r0.DelRegistry
+
+[DefaultUninstall.Services]
+DelService = C4lim3r0,0x200
+
+[DestinationDirs]
+DefaultDestDir   = 12
+C4lim3r0.DriverFiles = 12
+
+[C4lim3r0.Service]
+DisplayName      = "C4lim3r0"
+Description      = "C4lim3r0"
+ServiceBinary    = %12%\C4lim3r0.sys
+Dependencies     = "FltMgr"
+ServiceType      = 2                            ;SERVICE_FILE_SYSTEM_DRIVER
+StartType        = 3                            ;SERVICE_DEMAND_START
+ErrorControl     = 1                            ;SERVICE_ERROR_NORMAL
+LoadOrderGroup   = "FSFilter Activity Monitor"
+AddReg           = C4lim3r0.AddRegistry
+
+[C4lim3r0.AddRegistry]
+HKR,%RegInstancesSubkeyName%,%RegDefaultInstanceValueName%,0x00000000,%DefaultInstance%
+HKR,%RegInstancesSubkeyName%"\"%Instance1.Name%,%RegAltitudeValueName%,0x00000000,%Instance1.Altitude%
+HKR,%RegInstancesSubkeyName%"\"%Instance1.Name%,%RegFlagsValueName%,0x00010001,%Instance1.Flags%
+
+HKR,,AttachMethods,0x00010001,%AttachMethods%
+HKR,,VolumeDeviceTypes,0x00010001,%VolumeDeviceTypes%
+HKR,,FileSystems,0x00010001,%FileSystems%
+HKR,,Debug,0x00010001,%Debug%
+
+[Strings]
+C4lim3r0Registry                 = "system\currentcontrolset\services\C4lim3r0"
+
+RegInstancesSubkeyName       = "Instances"
+RegDefaultInstanceValueName  = "DefaultInstance"
+RegAltitudeValueName         = "Altitude"
+RegFlagsValueName            = "Flags"
+
+
+AttachMethods                = 0x00000005
+VolumeDeviceTypes            = 0x00000018
+FileSystems                  = 0x000000cc
+Debug                        = 0x00000000
+
+
+DefaultInstance      = "C4lim3r0 Instance"
+Instance1.Name       = "C4lim3r0 Instance"
+Instance1.Altitude   = "80000"
+Instance1.Flags      = 0x0              ; Allow all attachments - most likely will not allow later
