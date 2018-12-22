@@ -91,7 +91,7 @@ def parse_json(path, address):
 # 00CD0000
 
 def main(argc, argv):
-    for path in glob.glob(r'D:\Codes\LFHNotes\jsons\*'):
+    for path in glob.glob(r'jsons\*'):
         parse_json(path, 0x00D70000)
     return 1
 
