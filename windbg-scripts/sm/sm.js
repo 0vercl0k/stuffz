@@ -12,7 +12,6 @@
 //       1e5f10024c0: js!js::ArrayObject: Capacity: 10
 //       1e5f10024c0: js!js::ArrayObject:  Content: ['short', 13.37, new Map(...), ['loooooooooooooooooooooooooooooong', [0x1337, {'doare' : 'in d4 place'}]], false, null, undefined, true, atan2(), Math]
 //       @$smdump_jsvalue(vp[2].asBits_)
-
 //
 
 'use strict';
