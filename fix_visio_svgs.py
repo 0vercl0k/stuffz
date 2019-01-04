@@ -30,14 +30,17 @@ def main(argc, argv):
 
     assert(os.path.isfile(argv[1]) or os.path.isdir(argv[1]))
 
-    filenames = [argv[1]]
+    filepaths = [argv[1]]
     if os.path.isdir(argv[1]):
-        filenames = os.listdir(argv[1])
+        filepaths = map(
+            lambda p: os.path.join(argv[1], p),
+            os.listdir(argv[1])
+        )
 
-    for filename in filenames:
-        if not filename.endswith('.svg'):
+    for filepath in filepaths:
+        if not filepath.endswith('.svg'):
             continue
-        filepath = os.path.join(argv[1], filename)
+
         if fix_file(filepath):
             print 'Updated', filepath
 
