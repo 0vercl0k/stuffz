@@ -30,11 +30,11 @@ def main(argc, argv):
 
     assert(os.path.isfile(argv[1]) or os.path.isdir(argv[1]))
 
-    files = [argv[1]]
+    filenames = [argv[1]]
     if os.path.isdir(argv[1]):
-        files = os.listdir(argv[1])
+        filenames = os.listdir(argv[1])
 
-    for filename in os.listdir(argv[1]):
+    for filename in filenames:
         if not filename.endswith('.svg'):
             continue
         filepath = os.path.join(argv[1], filename)
