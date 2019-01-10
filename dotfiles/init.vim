@@ -9,12 +9,6 @@ Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 call plug#end()
 
-" Bugz
-"" nvim 0.3 bug workaround - see https://github.com/equalsraf/neovim-qt/issues/417
-if @% == ''
-  bd
-endif
-
 " General
 "" Be friendly to Windows. pls.
 source $VIMRUNTIME/mswin.vim
@@ -80,3 +74,4 @@ nmap <leader>9 <Plug>AirlineSelectTab9
 "" vim-airline-themes
 """ Solarized dark theme for vim-airline
 let g:airline_solarized_bg = 'dark'
+
