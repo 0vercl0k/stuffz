@@ -1,0 +1,37 @@
+# Axel '0vercl0k' Souchet - 24 March 2019
+. "$topsrcdir/browser/config/mozconfigs/win64/common-win64"
+
+# Enable ASan specific code and build workarounds
+ac_add_options --enable-address-sanitizer
+
+# Mandatory options required for ASan builds
+ac_add_options --enable-debug-symbols
+ac_add_options --disable-install-strip
+ac_add_options --disable-jemalloc
+ac_add_options --disable-crashreporter
+ac_add_options --disable-profiling
+
+# Enable fuzzing
+ac_add_options --enable-fuzzing
+
+# Enable some optimizations.
+ac_add_options --disable-debug
+ac_add_options --enable-optimize="-O2 -gline-tables-only"
+
+. "$topsrcdir/build/mozconfig.clang-cl"
+. "$topsrcdir/build/mozconfig.lld-link"
+
+# Use the clang version in .mozbuild
+# https://developer.mozilla.org/en-US/docs/Mozilla/Testing/Firefox_and_Address_Sanitizer
+# https://raw.githubusercontent.com/MozillaSecurity/mozilla-build-configs/master/windows/fuzzing.common
+# https://raw.githubusercontent.com/MozillaSecurity/mozilla-build-configs/master/windows/firefox.asan.fuzzing.release
+
+# Link
+export LDFLAGS="clang_rt.asan_dynamic-x86_64.lib clang_rt.asan_dynamic_runtime_thunk-x86_64.lib"
+CLANG_LIB_DIR="$(cd ~/.mozbuild/clang/lib/clang/*/lib/windows && pwd)"
+export MOZ_CLANG_RT_ASAN_LIB_PATH="${CLANG_LIB_DIR}/clang_rt.asan_dynamic-x86_64.dll"
+export LIB=$LIB:$CLANG_LIB_DIR
+
+ac_add_options --enable-js-shell
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-ff64-asan-fuzzing
+
