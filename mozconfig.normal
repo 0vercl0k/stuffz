@@ -1,7 +1,6 @@
 # Axel '0vercl0k' Souchet - 24 March 2019
 . "$topsrcdir/browser/config/mozconfigs/win64/common-win64"
 
-ac_add_options --disable-jemalloc
 ac_add_options --disable-crashreporter
 ac_add_options --disable-profiling
 ac_add_options --enable-debug-symbols
@@ -13,5 +12,7 @@ ac_add_options --enable-debug-symbols
 CLANG_LIB_DIR="$(cd ~/.mozbuild/clang/lib/clang/*/lib/windows && pwd)"
 export LIB=$LIB:$CLANG_LIB_DIR
 
+ac_add_options --enable-js-shell
+ac_add_options --enable-jitspew
 mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-ff64
 
