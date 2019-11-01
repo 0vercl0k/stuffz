@@ -1,4 +1,5 @@
 # Axel '0vercl0k' Souchet - 28th March 2019
+# ./mach build-backend -b CompileDB
 OUT_DIR=ff-woboq
 DATA_DIR=/data
 rm -rf $OUT_DIR
