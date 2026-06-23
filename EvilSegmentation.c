@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <windows.h>
 
-#define MERROR(x) { fprintf(stderr, "[!] An error occured in %s()|line-%d:\n\t-> '%s', GetLastError() = %.3d.\n", __FUNCTION__, __LINE__, (x), GetLastError()); }
+#define MERROR(x) { fprintf(stderr, "[!] An error occurred in %s()|line-%d:\n\t-> '%s', GetLastError() = %.3d.\n", __FUNCTION__, __LINE__, (x), GetLastError()); }
 #define MDISPLAY(...) { fprintf(stdout, "[+] "); fprintf(stdout, __VA_ARGS__); fprintf(stdout, ".\n"); }
 
 #if !defined(NT_SUCCESS)
